@@ -42,8 +42,19 @@ void __dead2 __stack_chk_fail(void)
  * Function is used to initialize/update canary value.
  * no_stack protector attribute needs to be specified
  * for this function.
+ *
+ * Note: no_stack_protector attribute is only available in:
+ * - GCC 11+
+ * - Clang (all versions with this attribute)
+ * For older GCC versions, use optimize attribute instead.
  */
+#if defined(__clang__)
 __attribute__((no_stack_protector))
+#elif defined(__GNUC__) && __GNUC__ >= 11
+__attribute__((no_stack_protector))
+#elif defined(__GNUC__)
+__attribute__((optimize("-fno-stack-protector")))
+#endif
 void rmm_init_stack_canary(void)
 {
 	spinlock_acquire(&stack_canary_init_lock);
