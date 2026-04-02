@@ -520,14 +520,12 @@ static void launch_spdm_responder_emu(char *base_dir)
 	char keys_abs[PATH_MAX];
 	char cmd[PATH_MAX * 2];
 
-	/* BANNED-API-CHECK[IGNORE] */
 	if (snprintf(bin_path, sizeof(bin_path), "%s%s", base_dir, rel_bin) >=
 	    (int)sizeof(bin_path)) {
 		ERROR("spdm-emu responder path is too long\n");
 		exit(1);
 	}
 
-	/* BANNED-API-CHECK[IGNORE] */
 	if (snprintf(keys_path, sizeof(keys_path), "%s%s", base_dir, rel_keys) >=
 	    (int)sizeof(keys_path)) {
 		ERROR("spdm-emu keys path is too long\n");
@@ -552,7 +550,6 @@ static void launch_spdm_responder_emu(char *base_dir)
 
 	if (pid == 0) {
 #if ENABLE_SPDM_EMU_DEBUG
-		/* BANNED-API-CHECK[IGNORE] */
 		if (snprintf(cmd, sizeof(cmd),
 			     "cd '%s' && '%s' --trans PCI_DOE 2>&1 | "
 			     "awk '{print \"%s[SPDM-EMU] \" $0 \"%s\"; fflush()}'",
@@ -561,7 +558,6 @@ static void launch_spdm_responder_emu(char *base_dir)
 			_exit(1);
 		}
 #else
-		/* BANNED-API-CHECK[IGNORE] */
 		if (snprintf(cmd, sizeof(cmd),
 			     "cd '%s' && '%s' --trans PCI_DOE > /dev/null 2>&1",
 			     keys_abs, bin_abs) >= (int)sizeof(cmd)) {
@@ -633,8 +629,7 @@ void initialise_app_headers(int argc, char *argv[])
 		}
 
 		/* Build full path */
-		/* BANNED-API-CHECK[IGNORE] */
-		(void) snprintf(full_path, path_len, "%s%s", base_dir, apps[idx].filename);
+		(void)snprintf(full_path, path_len, "%s%s", base_dir, apps[idx].filename);
 
 		/* Check if file exists and is readable */
 		FILE *test_file = fopen(full_path, "rb");
@@ -679,9 +674,9 @@ static void stop_spdm_responder(void)
 
 int main(int argc, char *argv[])
 {
-	int host_pdev_id = 0;
+	int host_pdev_id;
 	int host_vdev_id = -1;
-	int rc = 0;
+	int rc;
 	bool realm_created = false;
 
 	initialise_app_headers(argc, argv);
@@ -710,37 +705,44 @@ int main(int argc, char *argv[])
 
 	/* Start RMM */
 	(void)rmm_main(0UL);
-
-	/* Create a realm and a rec */
-	if (host_create_realm_and_activate(&g_realm) != 0) {
-		ERROR("ERROR: failed to create realm");
-		rc = -1;
-		goto out_cleanup;
-	}
-	realm_created = true;
+	INFO("[STAGE 0] RMM boot completed\n");
 
 	/*
 	 * Find devices (spdm_responder) and if any device exist create a PDEV
 	 * instance of the device with RMM and establish a secure session with
 	 * the device so that the device is in a assignable state to a Realm.
 	 */
+	INFO("[STAGE 1] host_pdev_probe_and_setup() - PDEV device discovery\n");
 	host_pdev_id = host_pdev_probe_and_setup();
 	if (host_pdev_id == -1) {
 		ERROR("ERROR: host_device_init failed.\n");
 		rc = -1;
 		goto out_cleanup;
 	}
+	INFO("[STAGE 1 DONE] host_pdev_id = %d\n", host_pdev_id);
+
+	/* Create a realm and a rec */
+	INFO("[STAGE 2] host_create_realm_and_activate() - Realm creation and RMM activation\n");
+	if (host_create_realm_and_activate(&g_realm) != 0) {
+		ERROR("ERROR: failed to create realm");
+		rc = -1;
+		goto out_cleanup;
+	}
+	realm_created = true;
+	INFO("[STAGE 2 DONE] Realm created, RMM activated\n");
 
 	/* Run rec to invoke attest related RSIs */
+	INFO("[STAGE 3] host_realm_run_attest() - Attestation RSI tests\n");
 	rc = host_realm_run_attest(&g_realm);
 	if (rc != 0) {
 		ERROR("ERROR: host_realm_rec_run_attest_rsi failed\n");
 		goto out_cleanup;
 	}
+	INFO("[STAGE 3 DONE] Attestation completed\n");
 
 	/* Create vdev instance and bind with the Realm */
 	if (host_pdev_id > 0) {
-		INFO("host: Assign vdev_tdi_id 0x%x to rd:\n", host_pdev_id);
+		INFO("[STAGE 4] host_vdev_assign() - VDEV assignment to Realm\n");
 		host_vdev_id = host_vdev_assign(&g_realm,
 						(unsigned long)host_pdev_id);
 		if (host_vdev_id < 0) {
@@ -748,13 +750,16 @@ int main(int argc, char *argv[])
 			rc = -1;
 			goto out_cleanup;
 		}
+		INFO("[STAGE 4 DONE] host_vdev_id = %d\n", host_vdev_id);
 
 		/* Run rec to invoke DA related RSIs */
+		INFO("[STAGE 5] host_realm_run_da() - Device Assignment RSI tests\n");
 		rc = host_realm_run_da(&g_realm);
 		if (rc != 0) {
 			ERROR("ERROR: host_realm_run_da_rsi failed\n");
 			goto out_cleanup;
 		}
+		INFO("[STAGE 5 DONE] Device Assignment completed\n");
 	}
 
 out_cleanup:
