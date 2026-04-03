@@ -551,7 +551,7 @@ static void launch_spdm_responder_emu(char *base_dir)
 	if (pid == 0) {
 #if ENABLE_SPDM_EMU_DEBUG
 		if (snprintf(cmd, sizeof(cmd),
-			     "cd '%s' && '%s' --trans PCI_DOE --ver 1.2 2>&1 | "
+			     "cd '%s' && '%s' --trans PCI_DOE 2>&1 | "
 			     "awk '{print \"%s[SPDM-EMU] \" $0 \"%s\"; fflush()}'",
 			     keys_abs, bin_abs, color_log, color_log_reset) >= (int)sizeof(cmd)) {
 			ERROR("Command line too long\n");
@@ -559,7 +559,7 @@ static void launch_spdm_responder_emu(char *base_dir)
 		}
 #else
 		if (snprintf(cmd, sizeof(cmd),
-			     "cd '%s' && '%s' --trans PCI_DOE --ver 1.2 > /dev/null 2>&1",
+			     "cd '%s' && '%s' --trans PCI_DOE > /dev/null 2>&1",
 			     keys_abs, bin_abs) >= (int)sizeof(cmd)) {
 			ERROR("Command line too long\n");
 			_exit(1);
