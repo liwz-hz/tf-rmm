@@ -60,7 +60,7 @@ def cmd_configure():
     
     BUILD_DIR.mkdir(parents=True, exist_ok=True)
     run_cmd(
-        ["cmake", "..", f"-DRMM_CONFIG={RMM_CONFIG}"],
+        ["cmake", "..", f"-DRMM_CONFIG={RMM_CONFIG}", "-DLOG_LEVEL=50"],
         cwd=BUILD_DIR
     )
 
