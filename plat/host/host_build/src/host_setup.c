@@ -707,29 +707,29 @@ int main(int argc, char *argv[])
 	(void)rmm_main(0UL);
 	INFO("[STAGE 0] RMM boot completed\n");
 
-	/*
-	 * Find devices (spdm_responder) and if any device exist create a PDEV
-	 * instance of the device with RMM and establish a secure session with
-	 * the device so that the device is in a assignable state to a Realm.
-	 */
-	INFO("[STAGE 1] host_pdev_probe_and_setup() - PDEV device discovery\n");
-	host_pdev_id = host_pdev_probe_and_setup();
-	if (host_pdev_id == -1) {
-		ERROR("ERROR: host_device_init failed.\n");
-		rc = -1;
-		goto out_cleanup;
-	}
-	INFO("[STAGE 1 DONE] host_pdev_id = %d\n", host_pdev_id);
-
 	/* Create a realm and a rec */
-	INFO("[STAGE 2] host_create_realm_and_activate() - Realm creation and RMM activation\n");
+	INFO("[STAGE 1] host_create_realm_and_activate() - Realm creation and RMM activation\n");
 	if (host_create_realm_and_activate(&g_realm) != 0) {
 		ERROR("ERROR: failed to create realm");
 		rc = -1;
 		goto out_cleanup;
 	}
 	realm_created = true;
-	INFO("[STAGE 2 DONE] Realm created, RMM activated\n");
+	INFO("[STAGE 1 DONE] Realm created, RMM activated\n");
+
+	/*
+	 * Find devices (spdm_responder) and if any device exist create a PDEV
+	 * instance of the device with RMM and establish a secure session with
+	 * the device so that the device is in a assignable state to a Realm.
+	 */
+	INFO("[STAGE 2] host_pdev_probe_and_setup() - PDEV device discovery\n");
+	host_pdev_id = host_pdev_probe_and_setup();
+	if (host_pdev_id == -1) {
+		ERROR("ERROR: host_device_init failed.\n");
+		rc = -1;
+		goto out_cleanup;
+	}
+	INFO("[STAGE 2 DONE] host_pdev_id = %d\n", host_pdev_id);
 
 	/* Run rec to invoke attest related RSIs */
 	INFO("[STAGE 3] host_realm_run_attest() - Attestation RSI tests\n");
