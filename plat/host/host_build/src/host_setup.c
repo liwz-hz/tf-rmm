@@ -674,7 +674,7 @@ static void stop_spdm_responder(void)
 
 int main(int argc, char *argv[])
 {
-	int host_pdev_id;
+	int host_pdev_id = 0;
 	int host_vdev_id = -1;
 	int rc;
 	bool realm_created = false;
