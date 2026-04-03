@@ -20,5 +20,6 @@
 	ignore = dirty
 [submodule "ext/spdm-emu"]
 	path = ext/spdm-emu
-	url = https://github.com/DMTF/spdm-emu.git
+	url = git@github.com:liwz-hz/spdm-emu.git
+	branch = tf-rmm-v3.6.0
 	ignore = dirty
