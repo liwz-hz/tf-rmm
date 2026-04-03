@@ -15,7 +15,7 @@ diff --git a/CMakeLists.txt b/CMakeLists.txt
 index ac6881d..edddcd3 100644
 --- a/CMakeLists.txt
 +++ b/CMakeLists.txt
-@@ -657,9 +657,9 @@ endif()
+@@ -657,11 +657,11 @@ endif()
      add_subdirectory(spdm_emu/spdm_requester_emu)
      add_subdirectory(spdm_emu/spdm_responder_emu)
  
@@ -27,7 +27,8 @@ index ac6881d..edddcd3 100644
 +    #add_subdirectory(spdm_emu/spdm_device_validator_sample)
  
      add_subdirectory(spdm_emu/spdm_device_attester_sample)
+     add_subdirectory(spdm_inproc_demo)
+     add_subdirectory(rmm_style_demo)
      endif()
 -- 
 2.34.1
-
