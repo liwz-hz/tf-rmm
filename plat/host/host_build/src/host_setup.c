@@ -27,7 +27,7 @@
 #include <unistd.h>
 
 /* Configuration: Enable/disable SPDM responder debug output */
-#define ENABLE_SPDM_EMU_DEBUG 0  /* Set to 1 to enable SPDM-EMU debug prints */
+#define ENABLE_SPDM_EMU_DEBUG 1  /* Set to 1 to enable SPDM-EMU debug prints */
 
 /* Create a simple 4 level (Lvl 0 - LvL 3) RTT structure */
 #define RTT_COUNT 4
@@ -551,7 +551,7 @@ static void launch_spdm_responder_emu(char *base_dir)
 	if (pid == 0) {
 #if ENABLE_SPDM_EMU_DEBUG
 		if (snprintf(cmd, sizeof(cmd),
-			     "cd '%s' && '%s' --trans PCI_DOE 2>&1 | "
+			     "cd '%s' && '%s' --trans PCI_DOE -v 2>&1 | "
 			     "awk '{print \"%s[SPDM-EMU] \" $0 \"%s\"; fflush()}'",
 			     keys_abs, bin_abs, color_log, color_log_reset) >= (int)sizeof(cmd)) {
 			ERROR("Command line too long\n");
@@ -559,7 +559,7 @@ static void launch_spdm_responder_emu(char *base_dir)
 		}
 #else
 		if (snprintf(cmd, sizeof(cmd),
-			     "cd '%s' && '%s' --trans PCI_DOE > /dev/null 2>&1",
+			     "cd '%s' && '%s' --trans PCI_DOE -v > /dev/null 2>&1",
 			     keys_abs, bin_abs) >= (int)sizeof(cmd)) {
 			ERROR("Command line too long\n");
 			_exit(1);
