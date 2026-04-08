@@ -4,6 +4,7 @@
  */
 
 #include <arpa/inet.h>
+#include <debug.h>
 #include <host_spdm_rsp_ifc.h>
 #include <netinet/in.h>
 #include <string.h>
@@ -32,6 +33,34 @@ typedef struct {
 
 /* static int spdm_rsp_fds[SPDM_RSP_EMU_MAX]; */
 static int g_sock_fd = -1;
+
+/* Helper function to print hex dump of data */
+static void print_hex_dump(const char *prefix, const uint8_t *data, size_t len)
+{
+	size_t i;
+	char buf[256];
+	int pos = 0;
+
+	if (len == 0) {
+		INFO("%s: (empty)\n", prefix);
+		return;
+	}
+
+	INFO("%s: len=%zu bytes\n", prefix, len);
+
+	for (i = 0; i < len; i++) {
+		if (i % 16 == 0) {
+			if (i > 0) {
+				INFO("%s\n", buf);
+			}
+			pos = snprintf(buf, sizeof(buf), "%04zx: ", i);
+		}
+		pos += snprintf(buf + pos, sizeof(buf) - pos, "%02x ", data[i]);
+	}
+	if (pos > 0) {
+		INFO("%s\n", buf);
+	}
+}
 
 int host_spdm_rsp_connect(int *spdm_rsp_id)
 {
@@ -246,6 +275,11 @@ static int host_send_doe_spdm_req(int spdm_rsp_id, const void *req_buf,
 	/* Send payload */
 	rc = send_bytes(spdm_rsp_id, req_buf, req_sz);
 
+	/* Print SPDM request info */
+	INFO("[SPDM TX] DOE header: vendor_id=0x%x, type=%u, len=%u\n",
+	     doe_hdr.vendor_id, doe_hdr.data_obj_type, doe_hdr.length);
+	print_hex_dump("[SPDM TX] Request data", (const uint8_t *)req_buf, req_sz);
+
 	return rc;
 }
 
@@ -293,6 +327,11 @@ static int host_recv_doe_spdm_rsp(int spdm_rsp_id, void *rsp_buf,
 	/* Read payload */
 	*rsp_sz = payload_sz - sizeof(pci_doe_header_t);
 	rc = recv_bytes(spdm_rsp_id, (uint8_t *)rsp_buf, *rsp_sz);
+
+	/* Print SPDM response info */
+	INFO("[SPDM RX] DOE header: vendor_id=0x%x, type=%u, len=%u\n",
+	     doe_hdr.vendor_id, doe_hdr.data_obj_type, doe_hdr.length);
+	print_hex_dump("[SPDM RX] Response data", (const uint8_t *)rsp_buf, *rsp_sz);
 
 	return rc;
 }
