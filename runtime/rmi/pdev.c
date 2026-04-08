@@ -173,7 +173,7 @@ unsigned long smc_pdev_create(unsigned long pdev_addr,
 	if ((EXTRACT(RMI_PDEV_FLAGS_SPDM, pdev_params.flags) !=
 	     RMI_PDEV_SPDM_TRUE) ||
 	    (EXTRACT(RMI_PDEV_FLAGS_NCOH_IDE, pdev_params.flags) !=
-	     RMI_PDEV_IDE_TRUE) ||
+	     RMI_PDEV_IDE_FALSE) ||
 	    (EXTRACT(RMI_PDEV_FLAGS_COH_IDE, pdev_params.flags) !=
 	     RMI_PDEV_IDE_FALSE) ||
 	    (EXTRACT(RMI_PDEV_FLAGS_COH_ADDR, pdev_params.flags) !=

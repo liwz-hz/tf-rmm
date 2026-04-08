@@ -828,11 +828,10 @@ static int host_pdev_setup(struct host_pdev *dev)
 	}
 
 	/*
-	 * Off chip PCIe device - set flags as non-coherent device protected by
-	 * end to end IDE, with SPDM.
+	 * Off chip PCIe device - set flags as SPDM enabled.
+	 * IDE is disabled for this configuration.
 	 */
-	dev->pdev_flags = (INPLACE(RMI_PDEV_FLAGS_SPDM, RMI_PDEV_SPDM_TRUE) |
-			   INPLACE(RMI_PDEV_FLAGS_NCOH_IDE, RMI_PDEV_IDE_TRUE));
+	dev->pdev_flags = INPLACE(RMI_PDEV_FLAGS_SPDM, RMI_PDEV_SPDM_TRUE);
 
 	/* Create a extended capability DVSEC in Root Port config space */
 	if (EXTRACT(RMI_PDEV_FLAGS_NCOH_IDE, dev->pdev_flags) == RMI_PDEV_IDE_TRUE) {
