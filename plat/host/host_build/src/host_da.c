@@ -833,19 +833,22 @@ static int host_pdev_setup(struct host_pdev *dev)
 	 */
 	dev->pdev_flags = INPLACE(RMI_PDEV_FLAGS_SPDM, RMI_PDEV_SPDM_TRUE);
 
-	/* Create a extended capability DVSEC in Root Port config space */
-	if (EXTRACT(RMI_PDEV_FLAGS_NCOH_IDE, dev->pdev_flags) == RMI_PDEV_IDE_TRUE) {
-		dev->root_id = HOST_ROOT_PORT_ID;
-		dev->ecam_addr = host_utils_pci_get_ecam_base();
+	/*
+	 * Get ECAM address for Root Port. Needed for TDISP DVSEC configuration
+	 * even when IDE is disabled.
+	 */
+	dev->root_id = HOST_ROOT_PORT_ID;
+	dev->ecam_addr = host_utils_pci_get_ecam_base();
 
-		rc = host_utils_pci_rp_dvsec_setup(dev->root_id);
-		if (rc != 0) {
-			INFO("pci_rp_dvsec_setup failed.\n");
-			rc = -1;
-			goto out_cleanup;
-		}
-	} else {
-		dev->ecam_addr = 0UL;
+	/*
+	 * Setup DVSEC in Root Port config space.
+	 * Required for both IDE and TDISP operations.
+	 */
+	rc = host_utils_pci_rp_dvsec_setup(dev->root_id);
+	if (rc != 0) {
+		INFO("pci_rp_dvsec_setup failed.\n");
+		rc = -1;
+		goto out_cleanup;
 	}
 
 	/* Get num of aux granules required for this PDEV */

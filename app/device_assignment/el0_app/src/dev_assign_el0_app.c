@@ -1226,9 +1226,13 @@ static int dev_assign_init(uintptr_t el0_heap, size_t heap_size, struct dev_assi
 	info->dev_handle = params->dev_handle;
 	info->cert_slot_id = params->cert_slot_id;
 	info->has_ide = params->has_ide;
+	/*
+	 * ecam_addr and rp_id are needed for both IDE and TDISP operations.
+	 * Always initialize them.
+	 */
+	info->ecam_addr = params->ecam_addr;
+	info->rp_id = params->rp_id;
 	if (info->has_ide) {
-		info->ecam_addr = params->ecam_addr;
-		info->rp_id = params->rp_id;
 		info->ide_sid = params->ide_sid;
 	}
 	info->spdm_cert_chain_digest_length = 0;

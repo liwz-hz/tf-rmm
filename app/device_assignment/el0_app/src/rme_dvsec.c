@@ -108,12 +108,16 @@ int dvsec_init(struct dev_assign_info *info)
 	unsigned long rp_ecam_addr;
 	unsigned int rp_dvsec_offset;
 
+	INFO("%s: ecam_addr=0x%lx, rp_id=0x%x\n", __func__, info->ecam_addr, info->rp_id);
+
 	rp_ecam_addr = info->ecam_addr +
 		(((unsigned long)PCIE_EXTRACT_BDF_BUS(info->rp_id) * PCIE_MAX_DEV *
 		  PCIE_MAX_FUNC * PCIE_CFG_SIZE) +
 		 ((unsigned long)PCIE_EXTRACT_BDF_DEV(info->rp_id) * PCIE_MAX_FUNC *
 		  PCIE_CFG_SIZE) +
 		 ((unsigned long)PCIE_EXTRACT_BDF_FUNC(info->rp_id) * PCIE_CFG_SIZE));
+
+	INFO("%s: rp_ecam_addr=0x%lx\n", __func__, rp_ecam_addr);
 
 	if ((info->ecam_addr + PCIE_ECAM_SIZE) < (rp_ecam_addr + PCIE_CFG_SIZE)) {
 		ERROR("%s: failed. 0x%lx not in ecam\n", __func__, rp_ecam_addr);

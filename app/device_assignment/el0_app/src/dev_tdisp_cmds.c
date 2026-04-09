@@ -21,6 +21,12 @@ int dev_tdisp_lock_main(struct dev_assign_info *info)
 
 	assert(info->dev_assign_op_params.param_type == DEV_ASSIGN_OP_PARAMS_TDISP);
 
+	/* Initialize DVSEC for Root Port access */
+	if (dvsec_init(info) != 0) {
+		ERROR("%s: dvsec_init failed.\n", __func__);
+		return DEV_ASSIGN_STATUS_ERROR;
+	}
+
 	(void)memset(&tdisp_id, 0, sizeof(pci_tdisp_interface_id_t));
 
 	tdisp_id.function_id = tdisp_params->tdi_id;

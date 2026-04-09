@@ -265,12 +265,12 @@ unsigned long smc_pdev_create(unsigned long pdev_addr,
 	if (EXTRACT(RMI_PDEV_FLAGS_NCOH_IDE, pdev_params.flags) ==
 	    RMI_PDEV_IDE_TRUE) {
 		dparams.has_ide = true;
-		dparams.ecam_addr = pdev_params.ecam_addr;
-		dparams.rp_id = pdev_params.root_id;
 		dparams.ide_sid = pdev_params.ide_sid;
 	} else {
 		dparams.has_ide = false;
 	}
+	dparams.ecam_addr = pdev_params.ecam_addr;
+	dparams.rp_id = pdev_params.root_id;
 	/* Use the PDEV aux pages for the DA app */
 	uintptr_t granule_pas[PDEV_PARAM_AUX_GRANULES_MAX];
 
