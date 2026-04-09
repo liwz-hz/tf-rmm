@@ -77,6 +77,15 @@ void host_rmi_vdev_get_state(void *vdev, struct smc_result *res);
 void host_rmi_vdev_abort(void *vdev, struct smc_result *res);
 void host_rmi_vdev_unlock(void *rd, void *pdev, void *vdev,
 			  struct smc_result *res);
+void host_rmi_vdev_lock(void *rd, void *pdev, void *vdev,
+			struct smc_result *res);
+void host_rmi_vdev_start(void *rd, void *pdev, void *vdev,
+			 struct smc_result *res);
+void host_rmi_vdev_get_interface_report(void *rd, void *pdev, void *vdev,
+					void *report_buf, uint32_t max_tdisp_version,
+					struct smc_result *res);
+void host_rmi_vdev_get_measurements(void *rd, void *pdev, void *vdev,
+				    void *meas_buf, struct smc_result *res);
 void host_rmi_vdev_destroy(void *rd, void *pdev, void *vdev,
 			   struct smc_result *res);
 void host_rmi_granule_tracking_get(unsigned long addr, struct smc_result *res);

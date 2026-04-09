@@ -1176,6 +1176,85 @@ int host_vdev_assign(struct host_realm *realm, unsigned long host_vdev_tdi_id)
 	return host_vdev_id;
 }
 
+int host_vdev_tdisp_start(struct host_realm *realm, int host_vdev_id)
+{
+	void *rd_ptr;
+	void *pdev_ptr;
+	void *vdev_ptr;
+	struct host_pdev *h_pdev;
+	struct host_vdev *h_vdev;
+	struct smc_result result;
+	int rc;
+	unsigned char state;
+
+	assert(host_vdev_id >= 0);
+
+	vdev_ptr = host_find_vdev_from_id(host_vdev_id);
+	pdev_ptr = host_find_pdev_from_vdev(vdev_ptr);
+
+	h_pdev = get_host_pdev_from_ptr(pdev_ptr);
+	h_vdev = get_host_vdev_from_ptr(vdev_ptr);
+
+	assert(vdev_ptr != NULL);
+	assert(pdev_ptr != NULL);
+	assert(h_pdev != NULL);
+	assert(h_vdev != NULL);
+
+	rd_ptr = realm->rd;
+
+	rc = host_vdev_get_state(h_vdev, &state);
+	if (rc != 0) {
+		return -1;
+	}
+
+	/*
+	 * VDEV_CREATE sets op=VDEV_OP_UNLOCK and state=NEW.
+	 * Need to call VDEV_COMMUNICATE first to transition NEW->UNLOCKED.
+	 */
+	if (state == RMI_VDEV_STATE_NEW) {
+		INFO("[TDISP] Transitioning VDEV from NEW to UNLOCKED...\n");
+		rc = host_dev_communicate(realm, h_pdev, h_vdev, RMI_VDEV_STATE_UNLOCKED);
+		if (rc != 0) {
+			ERROR("VDEV NEW -> UNLOCKED failed\n");
+			return -1;
+		}
+		INFO("[TDISP] VDEV now UNLOCKED\n");
+	} else if (state != RMI_VDEV_STATE_UNLOCKED) {
+		ERROR("VDEV not in valid state for LOCK, current state: %u\n", state);
+		return -1;
+	}
+
+	INFO("[TDISP] Locking VDEV...\n");
+	host_rmi_vdev_lock(rd_ptr, pdev_ptr, vdev_ptr, &result);
+	if (!IS_RMI_RESULT_SUCCESS(result)) {
+		ERROR("host_rmi_vdev_lock failed\n");
+		return -1;
+	}
+
+	rc = host_dev_communicate(realm, h_pdev, h_vdev, RMI_VDEV_STATE_LOCKED);
+	if (rc != 0) {
+		ERROR("TDISP LOCK failed\n");
+		return -1;
+	}
+	INFO("[TDISP] VDEV locked successfully\n");
+
+	INFO("[TDISP] Starting VDEV...\n");
+	host_rmi_vdev_start(rd_ptr, pdev_ptr, vdev_ptr, &result);
+	if (!IS_RMI_RESULT_SUCCESS(result)) {
+		ERROR("host_rmi_vdev_start failed\n");
+		return -1;
+	}
+
+	rc = host_dev_communicate(realm, h_pdev, h_vdev, RMI_VDEV_STATE_STARTED);
+	if (rc != 0) {
+		ERROR("TDISP START failed\n");
+		return -1;
+	}
+	INFO("[TDISP] VDEV started successfully\n");
+
+	return 0;
+}
+
 int host_vdev_reclaim(struct host_realm *realm, int host_vdev_id)
 {
 	void *rd_ptr;

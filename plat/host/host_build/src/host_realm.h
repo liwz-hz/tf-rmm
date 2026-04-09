@@ -52,5 +52,6 @@ int host_vdev_assign(struct host_realm *realm, unsigned long host_vdev_tdi_id);
 int host_realm_run_da(struct host_realm *realm);
 int host_pdev_reclaim(int host_pdev_id);
 int host_vdev_reclaim(struct host_realm *realm, int host_vdev_id);
+int host_vdev_tdisp_start(struct host_realm *realm, int host_vdev_id);
 
 #endif /* HOST_REALM_H */

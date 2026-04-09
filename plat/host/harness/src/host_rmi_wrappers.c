@@ -386,6 +386,37 @@ void host_rmi_vdev_unlock(void *rd, void *pdev, void *vdev,
 		(uintptr_t)pdev, (uintptr_t)vdev, 0, 0, 0, 0, res);
 }
 
+void host_rmi_vdev_lock(void *rd, void *pdev, void *vdev,
+			struct smc_result *res)
+{
+	handle_ns_smc(SMC_RMI_VDEV_LOCK, (uintptr_t)rd,
+		(uintptr_t)pdev, (uintptr_t)vdev, 0, 0, 0, 0, res);
+}
+
+void host_rmi_vdev_start(void *rd, void *pdev, void *vdev,
+			 struct smc_result *res)
+{
+	handle_ns_smc(SMC_RMI_VDEV_START, (uintptr_t)rd,
+		(uintptr_t)pdev, (uintptr_t)vdev, 0, 0, 0, 0, res);
+}
+
+void host_rmi_vdev_get_interface_report(void *rd, void *pdev, void *vdev,
+					void *report_buf, uint32_t max_tdisp_version,
+					struct smc_result *res)
+{
+	handle_ns_smc(SMC_RMI_VDEV_GET_INTERFACE_REPORT, (uintptr_t)rd,
+		(uintptr_t)pdev, (uintptr_t)vdev, (uintptr_t)report_buf,
+		(unsigned long)max_tdisp_version, 0, 0, res);
+}
+
+void host_rmi_vdev_get_measurements(void *rd, void *pdev, void *vdev,
+				    void *meas_buf, struct smc_result *res)
+{
+	handle_ns_smc(SMC_RMI_VDEV_GET_MEASUREMENTS, (uintptr_t)rd,
+		(uintptr_t)pdev, (uintptr_t)vdev, (uintptr_t)meas_buf,
+		0, 0, 0, res);
+}
+
 void host_rmi_vdev_destroy(void *rd, void *pdev, void *vdev,
 			   struct smc_result *res)
 {

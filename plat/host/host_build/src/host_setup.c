@@ -760,6 +760,15 @@ int main(int argc, char *argv[])
 			goto out_cleanup;
 		}
 		INFO("[STAGE 5 DONE] Device Assignment completed\n");
+
+		/* TDISP flow: Lock and Start VDEV */
+		INFO("[STAGE 6] host_vdev_tdisp_start() - TDISP Lock and Start\n");
+		rc = host_vdev_tdisp_start(&g_realm, host_vdev_id);
+		if (rc != 0) {
+			ERROR("ERROR: host_vdev_tdisp_start failed\n");
+			goto out_cleanup;
+		}
+		INFO("[STAGE 6 DONE] TDISP completed\n");
 	}
 
 out_cleanup:
