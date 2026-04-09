@@ -302,20 +302,154 @@ int dev_tdisp_stop_main(struct dev_assign_info *info);   // 停止接口
    │  └── PDEV_DESTROY
 ```
 
-## 5. IDE 相关说明
+## 5. DVSEC 配置流程
+
+### 5.1 DVSEC 概述
+
+DVSEC (Designated Vendor-Specific Extended Capability) 是 PCIe 扩展配置空间中的
+特殊能力结构，用于 TDISP 设备分配时配置 Root Port。
+
+**关键结构**:
+```c
+struct dvsec_rme_da {
+    uint32_t ech;            // Extended Capability Header
+    uint32_t dvsec_hdr1;     // Vendor ID (ARM: 0x13b5) + Revision
+    uint32_t dvsec_hdr2;     // DVSEC ID (RME_DA: 0xFF01)
+    uint32_t dvsec_rme_da_ctl_reg1;
+    uint32_t dvsec_rme_da_ctl_reg2;
+};
+```
+
+**DVSEC 标识**:
+- Extended Capability ID: `0x23` (DVSEC)
+- Vendor ID: `0x13b5` (ARM)
+- DVSEC ID: `0xFF01` (RME Device Assignment)
+
+### 5.2 ECAM 地址传递路径
+
+TDISP 需要 ECAM (Enhanced Configuration Access Mechanism) 地址来访问 Root Port
+配置空间。参数传递路径如下：
+
+```
+┌─────────────────────────────────────────────────────────────────┐
+│              ECAM Address Parameter Passing Path                 │
+└─────────────────────────────────────────────────────────────────┘
+
+1. Host 端 (host_da.c)
+   │  host_utils_pci_get_ecam_base() → 静态缓冲区地址
+   │  host_utils_pci_rp_dvsec_setup() → 配置 DVSEC
+   │  dev->ecam_addr = ECAM base address
+   │  dev->root_id = HOST_ROOT_PORT_ID (0x0)
+   │
+   ▼
+2. PDEV 创建 (pdev.c)
+   │  pdev_params->ecam_addr = dev->ecam_addr
+   │  pdev_params->root_id = dev->root_id
+   │  SMC_RMI_PDEV_CREATE → 传递到 RMM runtime
+   │
+   ▼
+3. Runtime (pdev.c)
+   │  dparams.ecam_addr = pdev_params.ecam_addr
+   │  dparams.rp_id = pdev_params.root_id
+   │  dev_assign_app_init() → 传递到 EL0 app
+   │
+   ▼
+4. EL0 App (dev_assign_el0_app.c)
+   │  info->ecam_addr = params->ecam_addr
+   │  info->rp_id = params->rp_id
+   │
+   ▼
+5. DVSEC 初始化 (rme_dvsec.c)
+   │  dvsec_init(info)
+   │  rp_ecam_addr = ecam_addr + (BDF offset)
+   │  pcie_find_arm_dvsec() → 找到 DVSEC offset
+   │  MMIO 读取验证 DVSEC 存在
+```
+
+### 5.3 DVSEC 初始化函数
+
+```c
+int dvsec_init(struct dev_assign_info *info)
+{
+    // 计算 Root Port ECAM 地址
+    rp_ecam_addr = info->ecam_addr +
+        (PCIE_EXTRACT_BDF_BUS(info->rp_id) * PCIE_MAX_DEV * PCIE_MAX_FUNC * PCIE_CFG_SIZE) +
+        (PCIE_EXTRACT_BDF_DEV(info->rp_id) * PCIE_MAX_FUNC * PCIE_CFG_SIZE) +
+        (PCIE_EXTRACT_BDF_FUNC(info->rp_id) * PCIE_CFG_SIZE);
+
+    // 查找 ARM RME-DA DVSEC
+    rp_dvsec_offset = pcie_find_arm_dvsec(info, rp_ecam_addr);
+    if (rp_dvsec_offset == 0U) {
+        return -1;  // 未找到 DVSEC
+    }
+
+    // 保存地址和偏移
+    info->rp_ecam_addr = rp_ecam_addr;
+    info->rp_dvsec_offset = rp_dvsec_offset;
+    return 0;
+}
+```
+
+### 5.4 重要修复说明
+
+**问题**: 禁用 IDE 后，`ecam_addr` 和 `rp_id` 未传递给 EL0 app，导致 `dvsec_init()` 失败。
+
+**原因分析**:
+```c
+// runtime/rmi/pdev.c (原代码)
+if (NCOH_IDE == TRUE) {
+    dparams.ecam_addr = pdev_params.ecam_addr;  // 只在IDE启用时设置
+    dparams.rp_id = pdev_params.root_id;
+} else {
+    dparams.has_ide = false;  // ecam_addr 未初始化，值为 0
+}
+```
+
+**修复方案**:
+将 `ecam_addr` 和 `rp_id` 的设置移到条件判断之外：
+
+```c
+// runtime/rmi/pdev.c (修复后)
+if (NCOH_IDE == TRUE) {
+    dparams.has_ide = true;
+    dparams.ide_sid = pdev_params.ide_sid;
+} else {
+    dparams.has_ide = false;
+}
+// 无论 IDE 状态，都必须设置
+dparams.ecam_addr = pdev_params.ecam_addr;
+dparams.rp_id = pdev_params.root_id;
+```
+
+**相关修改文件**:
+| 文件 | 修改内容 |
+|------|---------|
+| `runtime/rmi/pdev.c` | 移动 ecam_addr/rp_id 设置到条件外 |
+| `plat/host/host_build/src/host_da.c` | 始终配置 DVSEC 和 ecam_addr |
+| `app/el0_app/dev_assign_el0_app.c` | 始终初始化 ecam_addr/rp_id |
+| `app/el0_app/dev_tdisp_cmds.c` | LOCK 前调用 dvsec_init |
+
+## 6. IDE 相关说明
 
 当前 fakehost 配置禁用了 IDE (Link Integrity Encryption) 功能：
 
+**禁用 IDE 的原因**:
+- fakehost 是模拟环境，不涉及真实 PCIe 链路
+- IDE 密钥配置流程复杂，不影响 TDISP 核心功能验证
+- 简化测试流程，聚焦 SPDM 和 TDISP 交互
+
 **修改点**:
-1. `runtime/rmi/pdev.c`: 将 `NCOH_IDE == TRUE` 改为 `NCOH_IDE == FALSE`
-2. `plat/host/host_build/src/host_da.c`: 移除 `NCOH_IDE` 标志
+1. `runtime/rmi/pdev.c`: 验证 `NCOH_IDE == FALSE` 而非 TRUE
+2. `plat/host/host_build/src/host_da.c`: 移除 `NCOH_IDE` 标志设置
+3. 同时确保 DVSEC 配置不受 IDE 状态影响
 
 **IDE与SPDM/TDISP的关系**:
 - IDE是独立的PCIe链路加密机制
-- 不影响SPDM会话建立和TDISP流程
+- 不影响SPDM会话建立
+- TDISP 流程独立于 IDE（但需要 DVSEC）
 - IDE相关状态（COMMUNICATING, IDE_RESETTING）已被跳过
 
-## 6. 关键文件汇总
+## 7. 关键文件汇总
 
 | 类别 | 文件路径 |
 |------|---------|
@@ -323,11 +457,14 @@ int dev_tdisp_stop_main(struct dev_assign_info *info);   // 停止接口
 | **设备管理** | `plat/host/host_build/src/host_da.c` |
 | **启动流程** | `plat/host/host_build/src/host_setup.c` |
 | **TDISP命令** | `app/device_assignment/el0_app/src/dev_tdisp_cmds.c` |
+| **DVSEC配置** | `app/device_assignment/el0_app/src/rme_dvsec.c` |
+| **ECAM模拟** | `plat/host/harness/src/host_utils_pci.c` |
 | **RMI接口** | `plat/host/harness/src/host_rmi_wrappers.c` |
+| **PDEV创建** | `runtime/rmi/pdev.c` |
 | **SPDM标准** | `ext/libspdm/include/industry_standard/spdm.h` |
 | **TDISP标准** | `ext/libspdm/include/industry_standard/pci_tdisp.h` |
 
-## 7. 参考链接
+## 8. 参考链接
 
 - [DMTF SPDM Specification](https://www.dmtf.org/sites/default/files/standards/documents/DSP0274_1.2.0.pdf)
 - [PCIe DOE Specification](https://pcisig.com)
