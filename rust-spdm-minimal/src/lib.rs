@@ -1,4 +1,4 @@
-#![forbid(unsafe_code)]
+#![deny(unsafe_code)]
 #![cfg_attr(not(feature = "std"), no_std)]
 
 extern crate alloc;
@@ -9,6 +9,9 @@ pub mod message;
 pub mod protocol;
 pub mod crypto;
 pub mod session;
+
+#[cfg(feature = "ffi")]
+pub mod ffi;
 
 pub use context::SpdmContext;
 pub use error::{SpdmStatus, SpdmResult, is_error};

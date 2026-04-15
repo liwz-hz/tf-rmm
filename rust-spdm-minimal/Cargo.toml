@@ -26,6 +26,7 @@ cbindgen = "0.26"
 default = ["std"]
 std = []
 no_std = []
+ffi = []
 
 [profile.release]
 opt-level = 3
