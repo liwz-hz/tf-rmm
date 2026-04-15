@@ -23,7 +23,7 @@ BUILD_DIR = PROJECT_ROOT / "build"
 RMM_ELF = BUILD_DIR / "Release" / "rmm.elf"
 RMM_CONFIG = "host_defcfg"
 
-SPDM_EMU_PATH = Path("/home/lmm/code/spdm-emu/spdm-emu/build/bin/spdm_responder_emu")
+SPDM_EMU_PATH = BUILD_DIR / "Release" / "spdm_emu" / "spdm_responder_emu"
 SPDM_TRANSPORT = "PCI_DOE"
 SPDM_VERSION = "1.2"
 SPDM_PORT = 2323

@@ -29,9 +29,9 @@ Build output: `build/Release/rmm.elf`
 - `host_da.c`: SPDM only, no IDE flags
 - Do NOT "fix" IDE support - it's intentionally disabled for debugging
 
-## External Dependencies
-- SPDM responder emulator: `/home/lmm/code/spdm-emu/spdm-emu/build/bin/spdm_responder_emu`
-- Must be built separately before running
+## Build Output
+- `build/Release/rmm.elf` - RMM executable
+- `build/Release/spdm_emu/spdm_responder_emu` - SPDM responder (auto-built from submodule)
 
 ## Platform Code
 Fake_host platform: `plat/host/`
