@@ -186,6 +186,10 @@
 
 #define LIBSPDM_STATUS_BUFFER_TOO_SMALL 5
 
+#define LIBSPDM_HASH_SIZE_SHA256 32
+
+#define LIBSPDM_HASH_SIZE_SHA384 48
+
 typedef uint32_t libspdm_return_t;
 
 typedef void *libspdm_context_t;
@@ -197,6 +201,11 @@ typedef struct libspdm_data_parameter_t {
   uint8_t additional_data[4];
 } libspdm_data_parameter_t;
 
+typedef struct libspdm_spdm_error_struct_t {
+  uint8_t error_code;
+  uint8_t error_data;
+} libspdm_spdm_error_struct_t;
+
 typedef void *pci_ide_km_context_t;
 
 typedef struct pci_ide_km_key_set_t {
@@ -205,7 +214,37 @@ typedef struct pci_ide_km_key_set_t {
   uint8_t key[32];
 } pci_ide_km_key_set_t;
 
+typedef void *pci_tdisp_context_t;
+
+typedef struct pci_tdisp_interface_id_t {
+  uint8_t function_id;
+  uint16_t requester_stream_id;
+} pci_tdisp_interface_id_t;
+
+typedef struct pci_tdisp_requester_capabilities_t {
+  uint64_t flags;
+} pci_tdisp_requester_capabilities_t;
+
+typedef struct pci_tdisp_responder_capabilities_t {
+  uint64_t flags;
+} pci_tdisp_responder_capabilities_t;
+
+typedef struct pci_tdisp_lock_interface_param_t {
+  uint64_t lock_interface_flags;
+} pci_tdisp_lock_interface_param_t;
+
+typedef struct pci_tdisp_interface_report_t {
+  uint8_t interface_report[4096];
+  uint16_t interface_report_size;
+} pci_tdisp_interface_report_t;
+
 libspdm_return_t libspdm_init_context(libspdm_context_t context);
+
+libspdm_return_t libspdm_deinit_context(libspdm_context_t context);
+
+libspdm_return_t libspdm_init_connection(libspdm_context_t context);
+
+bool libspdm_check_context(libspdm_context_t context);
 
 libspdm_return_t libspdm_get_version(libspdm_context_t context,
                                      uint8_t *version_count,
@@ -223,6 +262,15 @@ libspdm_return_t libspdm_get_certificate(libspdm_context_t context,
                                          uint8_t slot_id,
                                          uintptr_t *cert_chain_size,
                                          uint8_t *cert_chain);
+
+libspdm_return_t libspdm_get_measurement_ex(libspdm_context_t context,
+                                            libspdm_session_id_t session_id,
+                                            uint8_t request_attribute,
+                                            uint8_t measurement_operation,
+                                            uint8_t slot_id,
+                                            uint8_t *number_of_blocks,
+                                            uint32_t *measurement_record_length,
+                                            uint8_t *measurement_record);
 
 libspdm_return_t libspdm_key_exchange(libspdm_context_t context,
                                       uint8_t measurement_hash_type,
@@ -286,9 +334,65 @@ libspdm_return_t libspdm_generate_nonce(libspdm_context_t context,
                                         uint8_t *nonce,
                                         uintptr_t nonce_size);
 
+libspdm_return_t libspdm_get_random_number(libspdm_context_t context,
+                                           uintptr_t random_number_size,
+                                           uint8_t *random_number);
+
+uintptr_t libspdm_get_hash_size(uint32_t hash_algo);
+
 void libspdm_free_context(libspdm_context_t context);
 
 libspdm_return_t libspdm_reset_context(libspdm_context_t context);
+
+libspdm_return_t libspdm_secured_message_get_last_spdm_error_struct(libspdm_context_t context,
+                                                                    libspdm_session_id_t session_id,
+                                                                    struct libspdm_spdm_error_struct_t *last_spdm_error_struct);
+
+libspdm_return_t libspdm_set_last_spdm_error_struct(libspdm_context_t context,
+                                                    libspdm_session_id_t session_id,
+                                                    const struct libspdm_spdm_error_struct_t *last_spdm_error_struct);
+
+void *libspdm_get_secured_message_context_via_session_id(libspdm_context_t context,
+                                                         libspdm_session_id_t session_id);
+
+libspdm_return_t libspdm_encode_secured_message(void *secured_message_context,
+                                                libspdm_session_id_t session_id,
+                                                bool is_request_message,
+                                                uintptr_t message_size,
+                                                const uint8_t *message,
+                                                uintptr_t *secured_message_size,
+                                                uint8_t *secured_message);
+
+libspdm_return_t libspdm_decode_secured_message(void *secured_message_context,
+                                                libspdm_session_id_t session_id,
+                                                bool is_request_message,
+                                                uintptr_t secured_message_size,
+                                                const uint8_t *secured_message,
+                                                uintptr_t *message_size,
+                                                uint8_t *message);
+
+libspdm_return_t libspdm_register_device_io_func(libspdm_context_t context,
+                                                 void *send_message_func,
+                                                 void *receive_message_func);
+
+libspdm_return_t libspdm_register_transport_layer_func(libspdm_context_t context,
+                                                       void *transport_encode_message_func,
+                                                       void *transport_decode_message_func);
+
+libspdm_return_t libspdm_register_device_buffer_func(libspdm_context_t context,
+                                                     void *acquire_sender_buffer_func,
+                                                     void *release_sender_buffer_func,
+                                                     void *acquire_receiver_buffer_func,
+                                                     void *release_receiver_buffer_func);
+
+uintptr_t libspdm_get_sizeof_required_scratch_buffer(libspdm_context_t context);
+
+libspdm_return_t libspdm_set_scratch_buffer(libspdm_context_t context,
+                                            uint8_t *scratch_buffer,
+                                            uintptr_t scratch_buffer_size);
+
+libspdm_return_t libspdm_register_verify_spdm_cert_chain_func(libspdm_context_t context,
+                                                              void *verify_spdm_cert_chain_func);
 
 libspdm_return_t pci_ide_km_query(pci_ide_km_context_t context,
                                   uint32_t session_id,
@@ -310,5 +414,51 @@ libspdm_return_t pci_ide_km_key_prog(pci_ide_km_context_t context,
                                      uint32_t session_id,
                                      uint8_t port_index,
                                      const struct pci_ide_km_key_set_t *key_set);
+
+libspdm_return_t pci_ide_km_key_set_go(pci_ide_km_context_t context,
+                                       uint32_t session_id,
+                                       uint8_t port_index,
+                                       const struct pci_ide_km_key_set_t *key_set);
+
+libspdm_return_t pci_ide_km_key_set_stop(pci_ide_km_context_t context,
+                                         uint32_t session_id,
+                                         uint8_t port_index,
+                                         const struct pci_ide_km_key_set_t *key_set);
+
+libspdm_return_t pci_tdisp_get_version(pci_tdisp_context_t context,
+                                       uint32_t session_id,
+                                       const struct pci_tdisp_interface_id_t *tdisp_id,
+                                       uint32_t *version);
+
+libspdm_return_t pci_tdisp_get_capabilities(pci_tdisp_context_t context,
+                                            uint32_t session_id,
+                                            const struct pci_tdisp_interface_id_t *tdisp_id,
+                                            const struct pci_tdisp_requester_capabilities_t *requester_capabilities,
+                                            struct pci_tdisp_responder_capabilities_t *responder_capabilities);
+
+libspdm_return_t pci_tdisp_get_interface_state(pci_tdisp_context_t context,
+                                               uint32_t session_id,
+                                               const struct pci_tdisp_interface_id_t *tdisp_id,
+                                               uint8_t *tdisp_state);
+
+libspdm_return_t pci_tdisp_lock_interface(pci_tdisp_context_t context,
+                                          uint32_t session_id,
+                                          const struct pci_tdisp_interface_id_t *tdisp_id,
+                                          const struct pci_tdisp_lock_interface_param_t *lock_interface_param,
+                                          uint8_t *nonce);
+
+libspdm_return_t pci_tdisp_get_interface_report(pci_tdisp_context_t context,
+                                                uint32_t session_id,
+                                                const struct pci_tdisp_interface_id_t *tdisp_id,
+                                                struct pci_tdisp_interface_report_t *interface_report);
+
+libspdm_return_t pci_tdisp_start_interface(pci_tdisp_context_t context,
+                                           uint32_t session_id,
+                                           const struct pci_tdisp_interface_id_t *tdisp_id,
+                                           const uint8_t *nonce);
+
+libspdm_return_t pci_tdisp_stop_interface(pci_tdisp_context_t context,
+                                          uint32_t session_id,
+                                          const struct pci_tdisp_interface_id_t *tdisp_id);
 
 #endif /* RUST_SPDM_MINIMAL_H */

@@ -66,3 +66,29 @@ pub extern "C" fn pci_ide_km_key_prog(
     }
     LIBSPDM_STATUS_SUCCESS
 }
+
+#[no_mangle]
+pub extern "C" fn pci_ide_km_key_set_go(
+    context: pci_ide_km_context_t,
+    session_id: u32,
+    port_index: u8,
+    key_set: *const pci_ide_km_key_set_t,
+) -> libspdm_return_t {
+    if context.is_null() || key_set.is_null() {
+        return LIBSPDM_STATUS_ERROR;
+    }
+    LIBSPDM_STATUS_SUCCESS
+}
+
+#[no_mangle]
+pub extern "C" fn pci_ide_km_key_set_stop(
+    context: pci_ide_km_context_t,
+    session_id: u32,
+    port_index: u8,
+    key_set: *const pci_ide_km_key_set_t,
+) -> libspdm_return_t {
+    if context.is_null() || key_set.is_null() {
+        return LIBSPDM_STATUS_ERROR;
+    }
+    LIBSPDM_STATUS_SUCCESS
+}

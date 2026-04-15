@@ -82,6 +82,46 @@ if(RMM_ARCH STREQUAL fake_host)
 endif()
 
 #
+# When using Rust SPDM, create stub libraries that link to rust-spdm-minimal
+# instead of building C libraries from spdm-emu
+#
+
+if(RMM_USE_RUST_SPDM)
+    message(STATUS "Using rust-spdm-minimal for DOE/TDISP/IDE-KM requester")
+
+    set(SPDM_EMU_SOURCE_DIR "${RMM_SOURCE_DIR}/ext/spdm-emu")
+
+    # Stub DOE requester - links to Rust SPDM
+    add_library(rmm-pci_doe_requester_lib INTERFACE)
+    target_link_libraries(rmm-pci_doe_requester_lib
+        INTERFACE rmm-spdm_requester)
+    target_include_directories(rmm-pci_doe_requester_lib
+        INTERFACE 
+            "${RMM_SOURCE_DIR}/rust-spdm-minimal/include"
+            "${SPDM_EMU_SOURCE_DIR}/include")
+
+    # Stub TDISP requester - links to DOE stub
+    add_library(rmm-pci_tdisp_requester_lib INTERFACE)
+    target_link_libraries(rmm-pci_tdisp_requester_lib
+        INTERFACE rmm-pci_doe_requester_lib)
+    target_include_directories(rmm-pci_tdisp_requester_lib
+        INTERFACE 
+            "${RMM_SOURCE_DIR}/rust-spdm-minimal/include"
+            "${SPDM_EMU_SOURCE_DIR}/include")
+
+    # Stub IDE-KM requester - Rust provides stub functions
+    add_library(rmm-pci-ide-km-requester-lib INTERFACE)
+    target_link_libraries(rmm-pci-ide-km-requester-lib
+        INTERFACE rmm-pci_doe_requester_lib)
+    target_include_directories(rmm-pci-ide-km-requester-lib
+        INTERFACE 
+            "${RMM_SOURCE_DIR}/rust-spdm-minimal/include"
+            "${SPDM_EMU_SOURCE_DIR}/include")
+
+    return()
+endif()
+
+#
 # Add rmm-pci_doe_requester_lib
 #
 

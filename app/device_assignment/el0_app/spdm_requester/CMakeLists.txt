@@ -6,6 +6,16 @@
 include(${CMAKE_SOURCE_DIR}/cmake/Sanitizers.cmake)
 
 #
+# Option to use Rust SPDM implementation instead of libspdm
+#
+arm_config_option(
+    NAME RMM_USE_RUST_SPDM
+    HELP "Use rust-spdm-minimal instead of libspdm for SPDM requester"
+    TYPE BOOL
+    DEFAULT OFF
+    ADVANCED)
+
+#
 # This compiles libraries in ext/libspdm project to add SPDM requester protocol
 # support in RMM.
 #
@@ -13,6 +23,27 @@ add_library(rmm-spdm_requester INTERFACE)
 
 # Skip rmm-spdm_requester from CMBC analysis
 if(RMM_CBMC_STATIC_ANALYSIS)
+    return()
+endif()
+
+# Use Rust SPDM implementation if enabled
+if(RMM_USE_RUST_SPDM)
+    message(STATUS "Using rust-spdm-minimal for SPDM requester")
+    
+    include(FindRustSpdm)
+    
+    # Link Rust SPDM library
+    target_link_libraries(rmm-spdm_requester INTERFACE rust-spdm-minimal)
+    
+    # Include Rust generated FFI header
+    target_include_directories(rmm-spdm_requester INTERFACE
+        "${RMM_SOURCE_DIR}/rust-spdm-minimal/include")
+    
+    # Also include libspdm headers for constants/structures (still needed by C code)
+    # Only include headers, don't build the library
+    target_include_directories(rmm-spdm_requester INTERFACE
+        "${RMM_SOURCE_DIR}/ext/libspdm/include")
+    
     return()
 endif()
 
