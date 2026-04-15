@@ -10,149 +10,138 @@ pub const LIBSPDM_STATUS_BUFFER_TOO_SMALL: u32 = 5;
 pub const LIBSPDM_HASH_SIZE_SHA256: usize = 32;
 pub const LIBSPDM_HASH_SIZE_SHA384: usize = 48;
 
+pub const LIBSPDM_DATA_SPDM_VERSION: u32 = 0;
+pub const LIBSPDM_DATA_SECURED_MESSAGE_VERSION: u32 = 1;
+pub const LIBSPDM_DATA_CAPABILITY_FLAGS: u32 = 2;
+pub const LIBSPDM_DATA_CAPABILITY_CT_EXPONENT: u32 = 3;
+pub const LIBSPDM_DATA_CAPABILITY_RTT_US: u32 = 4;
+pub const LIBSPDM_DATA_CAPABILITY_DATA_TRANSFER_SIZE: u32 = 5;
+pub const LIBSPDM_DATA_CAPABILITY_MAX_SPDM_MSG_SIZE: u32 = 6;
+pub const LIBSPDM_DATA_CONNECTION_STATE: u32 = 18;
+
+pub const LIBSPDM_CONNECTION_STATE_NOT_STARTED: u32 = 0;
+pub const LIBSPDM_CONNECTION_STATE_READY: u32 = 4;
+
+pub const LIBSPDM_DEFAULT_DATA_TRANSFER_SIZE: u32 = 4096;
+
 pub type libspdm_return_t = u32;
 pub type libspdm_context_t = *mut c_void;
 pub type libspdm_session_id_t = u32;
 
 #[repr(C)]
 pub struct libspdm_data_parameter_t {
-    location: u8,
-    additional_data: [u8; 4],
+    pub location: u8,
+    pub additional_data: [u8; 4],
 }
 
 #[repr(C)]
 pub struct libspdm_spdm_error_struct_t {
-    error_code: u8,
-    error_data: u8,
+    pub error_code: u8,
+    pub error_data: u8,
 }
 
 #[no_mangle]
-pub extern "C" fn libspdm_init_context(context: libspdm_context_t) -> libspdm_return_t {
-    if context.is_null() {
-        return LIBSPDM_STATUS_ERROR;
-    }
+pub extern "C" fn libspdm_init_context(_context: libspdm_context_t) -> libspdm_return_t {
     LIBSPDM_STATUS_SUCCESS
 }
 
 #[no_mangle]
-pub extern "C" fn libspdm_deinit_context(context: libspdm_context_t) -> libspdm_return_t {
-    if context.is_null() {
-        return LIBSPDM_STATUS_ERROR;
-    }
+pub extern "C" fn libspdm_deinit_context(_context: libspdm_context_t) -> libspdm_return_t {
     LIBSPDM_STATUS_SUCCESS
 }
 
 #[no_mangle]
-pub extern "C" fn libspdm_init_connection(
-    context: libspdm_context_t,
-) -> libspdm_return_t {
-    if context.is_null() {
-        return LIBSPDM_STATUS_ERROR;
-    }
+pub extern "C" fn libspdm_reset_context(_context: libspdm_context_t) -> libspdm_return_t {
     LIBSPDM_STATUS_SUCCESS
 }
 
 #[no_mangle]
-pub extern "C" fn libspdm_check_context(context: libspdm_context_t) -> bool {
-    if context.is_null() {
-        return false;
-    }
+pub extern "C" fn libspdm_init_connection(_context: libspdm_context_t) -> libspdm_return_t {
+    LIBSPDM_STATUS_SUCCESS
+}
+
+#[no_mangle]
+pub extern "C" fn libspdm_check_context(_context: libspdm_context_t) -> bool {
     true
 }
 
 #[no_mangle]
 pub extern "C" fn libspdm_get_version(
-    context: libspdm_context_t,
+    _context: libspdm_context_t,
     version_count: *mut u8,
     version_number_entry: *mut u32,
 ) -> libspdm_return_t {
-    if context.is_null() || version_count.is_null() {
+    if version_count.is_null() {
         return LIBSPDM_STATUS_ERROR;
     }
-    unsafe {
-        *version_count = 1;
-        if !version_number_entry.is_null() {
-            *version_number_entry = 0x12 << 24;
-        }
+    unsafe { *version_count = 1; }
+    if !version_number_entry.is_null() {
+        unsafe { *version_number_entry = 0x00120000; }
     }
     LIBSPDM_STATUS_SUCCESS
 }
 
 #[no_mangle]
-pub extern "C" fn libspdm_get_capabilities(
-    context: libspdm_context_t,
-) -> libspdm_return_t {
-    if context.is_null() {
-        return LIBSPDM_STATUS_ERROR;
-    }
+pub extern "C" fn libspdm_get_capabilities(_context: libspdm_context_t) -> libspdm_return_t {
     LIBSPDM_STATUS_SUCCESS
 }
 
 #[no_mangle]
-pub extern "C" fn libspdm_negotiate_algorithms(
-    context: libspdm_context_t,
-) -> libspdm_return_t {
-    if context.is_null() {
-        return LIBSPDM_STATUS_ERROR;
-    }
+pub extern "C" fn libspdm_negotiate_algorithms(_context: libspdm_context_t) -> libspdm_return_t {
     LIBSPDM_STATUS_SUCCESS
 }
 
 #[no_mangle]
 pub extern "C" fn libspdm_get_digests(
-    context: libspdm_context_t,
+    _context: libspdm_context_t,
     slot_mask: *mut u8,
-    total_digest_buffer: *mut u8,
+    _total_digest_buffer: *mut u8,
 ) -> libspdm_return_t {
-    if context.is_null() || slot_mask.is_null() {
+    if slot_mask.is_null() {
         return LIBSPDM_STATUS_ERROR;
     }
-    unsafe {
-        *slot_mask = 0x01;
-    }
+    unsafe { *slot_mask = 0x01; }
     LIBSPDM_STATUS_SUCCESS
 }
 
 #[no_mangle]
 pub extern "C" fn libspdm_get_certificate(
-    context: libspdm_context_t,
-    slot_id: u8,
+    _context: libspdm_context_t,
+    _slot_id: u8,
     cert_chain_size: *mut usize,
-    cert_chain: *mut u8,
+    _cert_chain: *mut u8,
 ) -> libspdm_return_t {
-    if context.is_null() || cert_chain_size.is_null() {
+    if cert_chain_size.is_null() {
         return LIBSPDM_STATUS_ERROR;
     }
+    unsafe { *cert_chain_size = 0; }
     LIBSPDM_STATUS_SUCCESS
 }
 
 #[no_mangle]
 pub extern "C" fn libspdm_get_measurement_ex(
-    context: libspdm_context_t,
-    session_id: libspdm_session_id_t,
-    request_attribute: u8,
-    measurement_operation: u8,
-    slot_id: u8,
-    number_of_blocks: *mut u8,
-    measurement_record_length: *mut u32,
-    measurement_record: *mut u8,
+    _context: libspdm_context_t,
+    _session_id: libspdm_session_id_t,
+    _request_attribute: u8,
+    _measurement_operation: u8,
+    _slot_id: u8,
+    _number_of_blocks: *mut u8,
+    _measurement_record_length: *mut u32,
+    _measurement_record: *mut u8,
 ) -> libspdm_return_t {
-    if context.is_null() {
-        return LIBSPDM_STATUS_ERROR;
-    }
     LIBSPDM_STATUS_SUCCESS
 }
 
 #[no_mangle]
 pub extern "C" fn libspdm_key_exchange(
-    context: libspdm_context_t,
-    measurement_hash_type: u8,
-    slot_id: u8,
+    _context: libspdm_context_t,
+    _measurement_hash_type: u8,
+    _slot_id: u8,
     session_id: *mut libspdm_session_id_t,
     heartbeat_period: *mut u8,
-    measurement_summary_hash: *mut u8,
+    _measurement_summary_hash: *mut u8,
 ) -> libspdm_return_t {
-    if context.is_null() || session_id.is_null() {
+    if session_id.is_null() {
         return LIBSPDM_STATUS_ERROR;
     }
     unsafe {
@@ -166,126 +155,120 @@ pub extern "C" fn libspdm_key_exchange(
 
 #[no_mangle]
 pub extern "C" fn libspdm_finish(
-    context: libspdm_context_t,
-    session_id: libspdm_session_id_t,
-    slot_id: u8,
-    request_attribute: u8,
+    _context: libspdm_context_t,
+    _session_id: libspdm_session_id_t,
+    _slot_id: u8,
+    _request_attribute: u8,
 ) -> libspdm_return_t {
-    if context.is_null() {
-        return LIBSPDM_STATUS_ERROR;
-    }
     LIBSPDM_STATUS_SUCCESS
 }
 
 #[no_mangle]
 pub extern "C" fn libspdm_end_session(
-    context: libspdm_context_t,
-    session_id: libspdm_session_id_t,
-    end_session_attributes: u8,
+    _context: libspdm_context_t,
+    _session_id: libspdm_session_id_t,
+    _end_session_attributes: u8,
 ) -> libspdm_return_t {
-    if context.is_null() {
-        return LIBSPDM_STATUS_ERROR;
-    }
     LIBSPDM_STATUS_SUCCESS
 }
 
 #[no_mangle]
 pub extern "C" fn libspdm_start_session(
-    context: libspdm_context_t,
-    session_id: libspdm_session_id_t,
+    _context: libspdm_context_t,
+    _session_id: libspdm_session_id_t,
 ) -> libspdm_return_t {
-    if context.is_null() {
-        return LIBSPDM_STATUS_ERROR;
-    }
     LIBSPDM_STATUS_SUCCESS
 }
 
 #[no_mangle]
 pub extern "C" fn libspdm_stop_session(
-    context: libspdm_context_t,
-    session_id: libspdm_session_id_t,
+    _context: libspdm_context_t,
+    _session_id: libspdm_session_id_t,
 ) -> libspdm_return_t {
-    if context.is_null() {
-        return LIBSPDM_STATUS_ERROR;
-    }
     LIBSPDM_STATUS_SUCCESS
 }
 
 #[no_mangle]
 pub extern "C" fn libspdm_send_receive_data(
-    context: libspdm_context_t,
-    session_id: libspdm_session_id_t,
-    request: *const u8,
-    request_size: usize,
-    response: *mut u8,
-    response_size: *mut usize,
+    _context: libspdm_context_t,
+    _session_id: libspdm_session_id_t,
+    _request: *const u8,
+    _request_size: usize,
+    _response: *mut u8,
+    _response_size: *mut usize,
 ) -> libspdm_return_t {
-    if context.is_null() || request.is_null() || response.is_null() || response_size.is_null() {
-        return LIBSPDM_STATUS_ERROR;
-    }
     LIBSPDM_STATUS_SUCCESS
 }
 
 #[no_mangle]
 pub extern "C" fn libspdm_get_data(
-    context: libspdm_context_t,
+    _context: libspdm_context_t,
     data_type: u32,
-    parameter: *const libspdm_data_parameter_t,
+    _parameter: *const libspdm_data_parameter_t,
     data: *mut c_void,
     data_size: *mut usize,
 ) -> libspdm_return_t {
-    if context.is_null() || data.is_null() || data_size.is_null() {
+    if data.is_null() || data_size.is_null() {
         return LIBSPDM_STATUS_ERROR;
+    }
+    unsafe {
+        match data_type {
+            LIBSPDM_DATA_CAPABILITY_DATA_TRANSFER_SIZE => {
+                *data_size = 4;
+                *(data as *mut u32) = LIBSPDM_DEFAULT_DATA_TRANSFER_SIZE;
+            }
+            LIBSPDM_DATA_CAPABILITY_MAX_SPDM_MSG_SIZE => {
+                *data_size = 4;
+                *(data as *mut u32) = 4096;
+            }
+            LIBSPDM_DATA_CONNECTION_STATE => {
+                *data_size = 4;
+                *(data as *mut u32) = LIBSPDM_CONNECTION_STATE_READY;
+            }
+            LIBSPDM_DATA_BASE_HASH_ALGO => {
+                *data_size = 4;
+                *(data as *mut u32) = 0x0002;
+            }
+            _ => { *data_size = 0; }
+        }
     }
     LIBSPDM_STATUS_SUCCESS
 }
 
 #[no_mangle]
 pub extern "C" fn libspdm_set_data(
-    context: libspdm_context_t,
-    data_type: u32,
-    parameter: *const libspdm_data_parameter_t,
-    data: *const c_void,
-    data_size: usize,
+    _context: libspdm_context_t,
+    _data_type: u32,
+    _parameter: *const libspdm_data_parameter_t,
+    _data: *const c_void,
+    _data_size: usize,
 ) -> libspdm_return_t {
-    if context.is_null() || data.is_null() {
-        return LIBSPDM_STATUS_ERROR;
-    }
     LIBSPDM_STATUS_SUCCESS
 }
 
 #[no_mangle]
 pub extern "C" fn libspdm_process_message(
-    context: libspdm_context_t,
-    session_id: libspdm_session_id_t,
-    message: *const u8,
-    message_size: usize,
+    _context: libspdm_context_t,
+    _session_id: libspdm_session_id_t,
+    _message: *const u8,
+    _message_size: usize,
 ) -> libspdm_return_t {
-    if context.is_null() || message.is_null() {
-        return LIBSPDM_STATUS_ERROR;
-    }
     LIBSPDM_STATUS_SUCCESS
 }
 
 #[no_mangle]
 pub extern "C" fn libspdm_register_get_response_func(
-    context: libspdm_context_t,
-    get_response_func: *mut c_void,
+    _context: libspdm_context_t,
+    _get_response_func: *mut c_void,
 ) -> libspdm_return_t {
-    if context.is_null() {
-        return LIBSPDM_STATUS_ERROR;
-    }
     LIBSPDM_STATUS_SUCCESS
 }
 
 #[no_mangle]
 pub extern "C" fn libspdm_is_session_established(
-    context: libspdm_context_t,
+    _context: libspdm_context_t,
     session_id: libspdm_session_id_t,
 ) -> bool {
-    if context.is_null() {
-        return false;
-    }
     session_id != 0
 }
 
@@ -302,38 +285,40 @@ pub extern "C" fn libspdm_get_session_info(
 
 #[no_mangle]
 pub extern "C" fn libspdm_secured_message_send_receive(
-    context: libspdm_context_t,
-    session_id: libspdm_session_id_t,
-    request: *const u8,
-    request_size: usize,
-    response: *mut u8,
-    response_size: *mut usize,
+    _context: libspdm_context_t,
+    _session_id: libspdm_session_id_t,
+    _request: *const u8,
+    _request_size: usize,
+    _response: *mut u8,
+    _response_size: *mut usize,
 ) -> libspdm_return_t {
-    if context.is_null() || request.is_null() || response.is_null() || response_size.is_null() {
-        return LIBSPDM_STATUS_ERROR;
-    }
     LIBSPDM_STATUS_SUCCESS
 }
 
 #[no_mangle]
 pub extern "C" fn libspdm_generate_nonce(
-    context: libspdm_context_t,
+    _context: libspdm_context_t,
     nonce: *mut u8,
     nonce_size: usize,
 ) -> libspdm_return_t {
-    if context.is_null() || nonce.is_null() || nonce_size < 32 {
+    if nonce.is_null() || nonce_size < 32 {
         return LIBSPDM_STATUS_ERROR;
+    }
+    unsafe {
+        for i in 0..nonce_size.min(32) {
+            *nonce.add(i) = i as u8;
+        }
     }
     LIBSPDM_STATUS_SUCCESS
 }
 
 #[no_mangle]
 pub extern "C" fn libspdm_get_random_number(
-    context: libspdm_context_t,
-    random_number_size: usize,
+    _context: libspdm_context_t,
+    _random_number_size: usize,
     random_number: *mut u8,
 ) -> libspdm_return_t {
-    if context.is_null() || random_number.is_null() {
+    if random_number.is_null() {
         return LIBSPDM_STATUS_ERROR;
     }
     LIBSPDM_STATUS_SUCCESS
@@ -349,26 +334,15 @@ pub extern "C" fn libspdm_get_hash_size(hash_algo: u32) -> usize {
 }
 
 #[no_mangle]
-pub extern "C" fn libspdm_free_context(context: libspdm_context_t) {
-    if !context.is_null() {
-    }
-}
-
-#[no_mangle]
-pub extern "C" fn libspdm_reset_context(context: libspdm_context_t) -> libspdm_return_t {
-    if context.is_null() {
-        return LIBSPDM_STATUS_ERROR;
-    }
-    LIBSPDM_STATUS_SUCCESS
-}
+pub extern "C" fn libspdm_free_context(_context: libspdm_context_t) {}
 
 #[no_mangle]
 pub extern "C" fn libspdm_secured_message_get_last_spdm_error_struct(
-    context: libspdm_context_t,
-    session_id: libspdm_session_id_t,
+    _context: libspdm_context_t,
+    _session_id: libspdm_session_id_t,
     last_spdm_error_struct: *mut libspdm_spdm_error_struct_t,
 ) -> libspdm_return_t {
-    if context.is_null() || last_spdm_error_struct.is_null() {
+    if last_spdm_error_struct.is_null() {
         return LIBSPDM_STATUS_ERROR;
     }
     unsafe {
@@ -380,13 +354,10 @@ pub extern "C" fn libspdm_secured_message_get_last_spdm_error_struct(
 
 #[no_mangle]
 pub extern "C" fn libspdm_set_last_spdm_error_struct(
-    context: libspdm_context_t,
-    session_id: libspdm_session_id_t,
-    last_spdm_error_struct: *const libspdm_spdm_error_struct_t,
+    _context: libspdm_context_t,
+    _session_id: libspdm_session_id_t,
+    _last_spdm_error_struct: *const libspdm_spdm_error_struct_t,
 ) -> libspdm_return_t {
-    if context.is_null() || last_spdm_error_struct.is_null() {
-        return LIBSPDM_STATUS_ERROR;
-    }
     LIBSPDM_STATUS_SUCCESS
 }
 
@@ -403,103 +374,77 @@ pub extern "C" fn libspdm_get_secured_message_context_via_session_id(
 
 #[no_mangle]
 pub extern "C" fn libspdm_encode_secured_message(
-    secured_message_context: *mut c_void,
-    session_id: libspdm_session_id_t,
-    is_request_message: bool,
-    message_size: usize,
-    message: *const u8,
-    secured_message_size: *mut usize,
-    secured_message: *mut u8,
+    _secured_message_context: *mut c_void,
+    _session_id: libspdm_session_id_t,
+    _is_request_message: bool,
+    _message_size: usize,
+    _message: *const u8,
+    _secured_message_size: *mut usize,
+    _secured_message: *mut u8,
 ) -> libspdm_return_t {
-    if secured_message_context.is_null() || message.is_null() || secured_message.is_null() {
-        return LIBSPDM_STATUS_ERROR;
-    }
     LIBSPDM_STATUS_SUCCESS
 }
 
 #[no_mangle]
 pub extern "C" fn libspdm_decode_secured_message(
-    secured_message_context: *mut c_void,
-    session_id: libspdm_session_id_t,
-    is_request_message: bool,
-    secured_message_size: usize,
-    secured_message: *const u8,
-    message_size: *mut usize,
-    message: *mut u8,
+    _secured_message_context: *mut c_void,
+    _session_id: libspdm_session_id_t,
+    _is_request_message: bool,
+    _secured_message_size: usize,
+    _secured_message: *const u8,
+    _message_size: *mut usize,
+    _message: *mut u8,
 ) -> libspdm_return_t {
-    if secured_message_context.is_null() || secured_message.is_null() || message.is_null() {
-        return LIBSPDM_STATUS_ERROR;
-    }
     LIBSPDM_STATUS_SUCCESS
 }
 
 #[no_mangle]
 pub extern "C" fn libspdm_register_device_io_func(
-    context: libspdm_context_t,
-    send_message_func: *mut c_void,
-    receive_message_func: *mut c_void,
+    _context: libspdm_context_t,
+    _send_message_func: *mut c_void,
+    _receive_message_func: *mut c_void,
 ) -> libspdm_return_t {
-    if context.is_null() {
-        return LIBSPDM_STATUS_ERROR;
-    }
     LIBSPDM_STATUS_SUCCESS
 }
 
 #[no_mangle]
 pub extern "C" fn libspdm_register_transport_layer_func(
-    context: libspdm_context_t,
-    transport_encode_message_func: *mut c_void,
-    transport_decode_message_func: *mut c_void,
+    _context: libspdm_context_t,
+    _transport_encode_message_func: *mut c_void,
+    _transport_decode_message_func: *mut c_void,
 ) -> libspdm_return_t {
-    if context.is_null() {
-        return LIBSPDM_STATUS_ERROR;
-    }
     LIBSPDM_STATUS_SUCCESS
 }
 
 #[no_mangle]
 pub extern "C" fn libspdm_register_device_buffer_func(
-    context: libspdm_context_t,
-    acquire_sender_buffer_func: *mut c_void,
-    release_sender_buffer_func: *mut c_void,
-    acquire_receiver_buffer_func: *mut c_void,
-    release_receiver_buffer_func: *mut c_void,
+    _context: libspdm_context_t,
+    _acquire_sender_buffer_func: *mut c_void,
+    _release_sender_buffer_func: *mut c_void,
+    _acquire_receiver_buffer_func: *mut c_void,
+    _release_receiver_buffer_func: *mut c_void,
 ) -> libspdm_return_t {
-    if context.is_null() {
-        return LIBSPDM_STATUS_ERROR;
-    }
     LIBSPDM_STATUS_SUCCESS
 }
 
 #[no_mangle]
-pub extern "C" fn libspdm_get_sizeof_required_scratch_buffer(
-    context: libspdm_context_t,
-) -> usize {
-    if context.is_null() {
-        return 0;
-    }
+pub extern "C" fn libspdm_get_sizeof_required_scratch_buffer(_context: libspdm_context_t) -> usize {
     4096
 }
 
 #[no_mangle]
 pub extern "C" fn libspdm_set_scratch_buffer(
-    context: libspdm_context_t,
-    scratch_buffer: *mut u8,
-    scratch_buffer_size: usize,
+    _context: libspdm_context_t,
+    _scratch_buffer: *mut u8,
+    _scratch_buffer_size: usize,
 ) -> libspdm_return_t {
-    if context.is_null() || scratch_buffer.is_null() {
-        return LIBSPDM_STATUS_ERROR;
-    }
     LIBSPDM_STATUS_SUCCESS
 }
 
 #[no_mangle]
 pub extern "C" fn libspdm_register_verify_spdm_cert_chain_func(
-    context: libspdm_context_t,
-    verify_spdm_cert_chain_func: *mut c_void,
+    _context: libspdm_context_t,
+    _verify_spdm_cert_chain_func: *mut c_void,
 ) -> libspdm_return_t {
-    if context.is_null() {
-        return LIBSPDM_STATUS_ERROR;
-    }
     LIBSPDM_STATUS_SUCCESS
 }

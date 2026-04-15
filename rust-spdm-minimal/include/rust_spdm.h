@@ -190,6 +190,28 @@
 
 #define LIBSPDM_HASH_SIZE_SHA384 48
 
+#define LIBSPDM_DATA_SPDM_VERSION 0
+
+#define LIBSPDM_DATA_SECURED_MESSAGE_VERSION 1
+
+#define LIBSPDM_DATA_CAPABILITY_FLAGS 2
+
+#define LIBSPDM_DATA_CAPABILITY_CT_EXPONENT 3
+
+#define LIBSPDM_DATA_CAPABILITY_RTT_US 4
+
+#define LIBSPDM_DATA_CAPABILITY_DATA_TRANSFER_SIZE 5
+
+#define LIBSPDM_DATA_CAPABILITY_MAX_SPDM_MSG_SIZE 6
+
+#define LIBSPDM_DATA_CONNECTION_STATE 18
+
+#define LIBSPDM_CONNECTION_STATE_NOT_STARTED 0
+
+#define LIBSPDM_CONNECTION_STATE_READY 4
+
+#define LIBSPDM_DEFAULT_DATA_TRANSFER_SIZE 4096
+
 typedef uint32_t libspdm_return_t;
 
 typedef void *libspdm_context_t;
@@ -238,161 +260,162 @@ typedef struct pci_tdisp_interface_report_t {
   uint16_t interface_report_size;
 } pci_tdisp_interface_report_t;
 
-libspdm_return_t libspdm_init_context(libspdm_context_t context);
+libspdm_return_t libspdm_init_context(libspdm_context_t _context);
 
-libspdm_return_t libspdm_deinit_context(libspdm_context_t context);
+libspdm_return_t libspdm_deinit_context(libspdm_context_t _context);
 
-libspdm_return_t libspdm_init_connection(libspdm_context_t context);
+libspdm_return_t libspdm_reset_context(libspdm_context_t _context);
 
-bool libspdm_check_context(libspdm_context_t context);
+libspdm_return_t libspdm_init_connection(libspdm_context_t _context);
 
-libspdm_return_t libspdm_get_version(libspdm_context_t context,
+bool libspdm_check_context(libspdm_context_t _context);
+
+libspdm_return_t libspdm_get_version(libspdm_context_t _context,
                                      uint8_t *version_count,
                                      uint32_t *version_number_entry);
 
-libspdm_return_t libspdm_get_capabilities(libspdm_context_t context);
+libspdm_return_t libspdm_get_capabilities(libspdm_context_t _context);
 
-libspdm_return_t libspdm_negotiate_algorithms(libspdm_context_t context);
+libspdm_return_t libspdm_negotiate_algorithms(libspdm_context_t _context);
 
-libspdm_return_t libspdm_get_digests(libspdm_context_t context,
+libspdm_return_t libspdm_get_digests(libspdm_context_t _context,
                                      uint8_t *slot_mask,
-                                     uint8_t *total_digest_buffer);
+                                     uint8_t *_total_digest_buffer);
 
-libspdm_return_t libspdm_get_certificate(libspdm_context_t context,
-                                         uint8_t slot_id,
+libspdm_return_t libspdm_get_certificate(libspdm_context_t _context,
+                                         uint8_t _slot_id,
                                          uintptr_t *cert_chain_size,
-                                         uint8_t *cert_chain);
+                                         uint8_t *_cert_chain);
 
-libspdm_return_t libspdm_get_measurement_ex(libspdm_context_t context,
-                                            libspdm_session_id_t session_id,
-                                            uint8_t request_attribute,
-                                            uint8_t measurement_operation,
-                                            uint8_t slot_id,
-                                            uint8_t *number_of_blocks,
-                                            uint32_t *measurement_record_length,
-                                            uint8_t *measurement_record);
+libspdm_return_t libspdm_get_measurement_ex(libspdm_context_t _context,
+                                            libspdm_session_id_t _session_id,
+                                            uint8_t _request_attribute,
+                                            uint8_t _measurement_operation,
+                                            uint8_t _slot_id,
+                                            uint8_t *_number_of_blocks,
+                                            uint32_t *_measurement_record_length,
+                                            uint8_t *_measurement_record);
 
-libspdm_return_t libspdm_key_exchange(libspdm_context_t context,
-                                      uint8_t measurement_hash_type,
-                                      uint8_t slot_id,
+libspdm_return_t libspdm_key_exchange(libspdm_context_t _context,
+                                      uint8_t _measurement_hash_type,
+                                      uint8_t _slot_id,
                                       libspdm_session_id_t *session_id,
                                       uint8_t *heartbeat_period,
-                                      uint8_t *measurement_summary_hash);
+                                      uint8_t *_measurement_summary_hash);
 
-libspdm_return_t libspdm_finish(libspdm_context_t context,
-                                libspdm_session_id_t session_id,
-                                uint8_t slot_id,
-                                uint8_t request_attribute);
+libspdm_return_t libspdm_finish(libspdm_context_t _context,
+                                libspdm_session_id_t _session_id,
+                                uint8_t _slot_id,
+                                uint8_t _request_attribute);
 
-libspdm_return_t libspdm_end_session(libspdm_context_t context,
-                                     libspdm_session_id_t session_id,
-                                     uint8_t end_session_attributes);
+libspdm_return_t libspdm_end_session(libspdm_context_t _context,
+                                     libspdm_session_id_t _session_id,
+                                     uint8_t _end_session_attributes);
 
-libspdm_return_t libspdm_start_session(libspdm_context_t context, libspdm_session_id_t session_id);
+libspdm_return_t libspdm_start_session(libspdm_context_t _context,
+                                       libspdm_session_id_t _session_id);
 
-libspdm_return_t libspdm_stop_session(libspdm_context_t context, libspdm_session_id_t session_id);
+libspdm_return_t libspdm_stop_session(libspdm_context_t _context, libspdm_session_id_t _session_id);
 
-libspdm_return_t libspdm_send_receive_data(libspdm_context_t context,
-                                           libspdm_session_id_t session_id,
-                                           const uint8_t *request,
-                                           uintptr_t request_size,
-                                           uint8_t *response,
-                                           uintptr_t *response_size);
+libspdm_return_t libspdm_send_receive_data(libspdm_context_t _context,
+                                           libspdm_session_id_t _session_id,
+                                           const uint8_t *_request,
+                                           uintptr_t _request_size,
+                                           uint8_t *_response,
+                                           uintptr_t *_response_size);
 
-libspdm_return_t libspdm_get_data(libspdm_context_t context,
+libspdm_return_t libspdm_get_data(libspdm_context_t _context,
                                   uint32_t data_type,
-                                  const struct libspdm_data_parameter_t *parameter,
+                                  const struct libspdm_data_parameter_t *_parameter,
                                   void *data,
                                   uintptr_t *data_size);
 
-libspdm_return_t libspdm_set_data(libspdm_context_t context,
-                                  uint32_t data_type,
-                                  const struct libspdm_data_parameter_t *parameter,
-                                  const void *data,
-                                  uintptr_t data_size);
+libspdm_return_t libspdm_set_data(libspdm_context_t _context,
+                                  uint32_t _data_type,
+                                  const struct libspdm_data_parameter_t *_parameter,
+                                  const void *_data,
+                                  uintptr_t _data_size);
 
-libspdm_return_t libspdm_process_message(libspdm_context_t context,
-                                         libspdm_session_id_t session_id,
-                                         const uint8_t *message,
-                                         uintptr_t message_size);
+libspdm_return_t libspdm_process_message(libspdm_context_t _context,
+                                         libspdm_session_id_t _session_id,
+                                         const uint8_t *_message,
+                                         uintptr_t _message_size);
 
-libspdm_return_t libspdm_register_get_response_func(libspdm_context_t context,
-                                                    void *get_response_func);
+libspdm_return_t libspdm_register_get_response_func(libspdm_context_t _context,
+                                                    void *_get_response_func);
 
-bool libspdm_is_session_established(libspdm_context_t context, libspdm_session_id_t session_id);
+bool libspdm_is_session_established(libspdm_context_t _context, libspdm_session_id_t session_id);
 
 void *libspdm_get_session_info(libspdm_context_t context, libspdm_session_id_t session_id);
 
-libspdm_return_t libspdm_secured_message_send_receive(libspdm_context_t context,
-                                                      libspdm_session_id_t session_id,
-                                                      const uint8_t *request,
-                                                      uintptr_t request_size,
-                                                      uint8_t *response,
-                                                      uintptr_t *response_size);
+libspdm_return_t libspdm_secured_message_send_receive(libspdm_context_t _context,
+                                                      libspdm_session_id_t _session_id,
+                                                      const uint8_t *_request,
+                                                      uintptr_t _request_size,
+                                                      uint8_t *_response,
+                                                      uintptr_t *_response_size);
 
-libspdm_return_t libspdm_generate_nonce(libspdm_context_t context,
+libspdm_return_t libspdm_generate_nonce(libspdm_context_t _context,
                                         uint8_t *nonce,
                                         uintptr_t nonce_size);
 
-libspdm_return_t libspdm_get_random_number(libspdm_context_t context,
-                                           uintptr_t random_number_size,
+libspdm_return_t libspdm_get_random_number(libspdm_context_t _context,
+                                           uintptr_t _random_number_size,
                                            uint8_t *random_number);
 
 uintptr_t libspdm_get_hash_size(uint32_t hash_algo);
 
-void libspdm_free_context(libspdm_context_t context);
+void libspdm_free_context(libspdm_context_t _context);
 
-libspdm_return_t libspdm_reset_context(libspdm_context_t context);
-
-libspdm_return_t libspdm_secured_message_get_last_spdm_error_struct(libspdm_context_t context,
-                                                                    libspdm_session_id_t session_id,
+libspdm_return_t libspdm_secured_message_get_last_spdm_error_struct(libspdm_context_t _context,
+                                                                    libspdm_session_id_t _session_id,
                                                                     struct libspdm_spdm_error_struct_t *last_spdm_error_struct);
 
-libspdm_return_t libspdm_set_last_spdm_error_struct(libspdm_context_t context,
-                                                    libspdm_session_id_t session_id,
-                                                    const struct libspdm_spdm_error_struct_t *last_spdm_error_struct);
+libspdm_return_t libspdm_set_last_spdm_error_struct(libspdm_context_t _context,
+                                                    libspdm_session_id_t _session_id,
+                                                    const struct libspdm_spdm_error_struct_t *_last_spdm_error_struct);
 
 void *libspdm_get_secured_message_context_via_session_id(libspdm_context_t context,
                                                          libspdm_session_id_t session_id);
 
-libspdm_return_t libspdm_encode_secured_message(void *secured_message_context,
-                                                libspdm_session_id_t session_id,
-                                                bool is_request_message,
-                                                uintptr_t message_size,
-                                                const uint8_t *message,
-                                                uintptr_t *secured_message_size,
-                                                uint8_t *secured_message);
+libspdm_return_t libspdm_encode_secured_message(void *_secured_message_context,
+                                                libspdm_session_id_t _session_id,
+                                                bool _is_request_message,
+                                                uintptr_t _message_size,
+                                                const uint8_t *_message,
+                                                uintptr_t *_secured_message_size,
+                                                uint8_t *_secured_message);
 
-libspdm_return_t libspdm_decode_secured_message(void *secured_message_context,
-                                                libspdm_session_id_t session_id,
-                                                bool is_request_message,
-                                                uintptr_t secured_message_size,
-                                                const uint8_t *secured_message,
-                                                uintptr_t *message_size,
-                                                uint8_t *message);
+libspdm_return_t libspdm_decode_secured_message(void *_secured_message_context,
+                                                libspdm_session_id_t _session_id,
+                                                bool _is_request_message,
+                                                uintptr_t _secured_message_size,
+                                                const uint8_t *_secured_message,
+                                                uintptr_t *_message_size,
+                                                uint8_t *_message);
 
-libspdm_return_t libspdm_register_device_io_func(libspdm_context_t context,
-                                                 void *send_message_func,
-                                                 void *receive_message_func);
+libspdm_return_t libspdm_register_device_io_func(libspdm_context_t _context,
+                                                 void *_send_message_func,
+                                                 void *_receive_message_func);
 
-libspdm_return_t libspdm_register_transport_layer_func(libspdm_context_t context,
-                                                       void *transport_encode_message_func,
-                                                       void *transport_decode_message_func);
+libspdm_return_t libspdm_register_transport_layer_func(libspdm_context_t _context,
+                                                       void *_transport_encode_message_func,
+                                                       void *_transport_decode_message_func);
 
-libspdm_return_t libspdm_register_device_buffer_func(libspdm_context_t context,
-                                                     void *acquire_sender_buffer_func,
-                                                     void *release_sender_buffer_func,
-                                                     void *acquire_receiver_buffer_func,
-                                                     void *release_receiver_buffer_func);
+libspdm_return_t libspdm_register_device_buffer_func(libspdm_context_t _context,
+                                                     void *_acquire_sender_buffer_func,
+                                                     void *_release_sender_buffer_func,
+                                                     void *_acquire_receiver_buffer_func,
+                                                     void *_release_receiver_buffer_func);
 
-uintptr_t libspdm_get_sizeof_required_scratch_buffer(libspdm_context_t context);
+uintptr_t libspdm_get_sizeof_required_scratch_buffer(libspdm_context_t _context);
 
-libspdm_return_t libspdm_set_scratch_buffer(libspdm_context_t context,
-                                            uint8_t *scratch_buffer,
-                                            uintptr_t scratch_buffer_size);
+libspdm_return_t libspdm_set_scratch_buffer(libspdm_context_t _context,
+                                            uint8_t *_scratch_buffer,
+                                            uintptr_t _scratch_buffer_size);
 
-libspdm_return_t libspdm_register_verify_spdm_cert_chain_func(libspdm_context_t context,
-                                                              void *verify_spdm_cert_chain_func);
+libspdm_return_t libspdm_register_verify_spdm_cert_chain_func(libspdm_context_t _context,
+                                                              void *_verify_spdm_cert_chain_func);
 
 libspdm_return_t pci_ide_km_query(pci_ide_km_context_t context,
                                   uint32_t session_id,

@@ -2,49 +2,197 @@
 
 ## 一、整体架构
 
-```
-┌─────────────────────────────────────────────────────────────────┐
-│                          rmm.elf                                 │
-│                                                                 │
-│  ┌─────────────────────────────────────────────────────────┐   │
-│  │  rust-spdm-minimal (单一 Rust 库)                        │   │
-│  │                                                         │   │
-│  │  ├── spdm_core                                          │   │
-│  │  │   ├── context.rs      (SpdmContext)                 │   │
-│  │  │   ├── protocol.rs     (VERSION/CAPS/ALGO/CERT/...)  │   │
-│  │  │   ├── session.rs      (KEY_EX/FINISH/密钥派生)      │   │
-│  │  │   ├── message.rs      (SPDM 消息编解码)             │   │
-│  │  │   └── crypto.rs       (加密后端)                    │   │
-│  │  │                                                      │   │
-│  │  ├── doe_layer                                          │   │
-│  │  │   ├── pci_doe.rs      (DOE 封装)                    │   │
-│  │  │   └── vendor.rs       (VDM 封装)                    │   │
-│  │  │                                                      │   │
-│  │  ├── tdisp_layer                                        │   │
-│  │  │   ├── tdisp.rs        (TDISP 协议)                  │   │
-│  │  │   └── tdisp_msg.rs    (TDISP 消息)                  │   │
-│  │  │                                                      │   │
-│  │  ├── ffi                                                │   │
-│  │  │   ├── libspdm.rs      (libspdm_* FFI)               │   │
-│  │  │   ├── pci_doe.rs      (pci_doe_* FFI)               │   │
-│  │  │   ├── pci_tdisp.rs    (pci_tdisp_* FFI)             │   │
-│  │  │   └── pci_ide_km.rs   (pci_ide_km_* 打桩)           │   │
-│  │  │                                                      │   │
-│  │  └── types                                              │   │
-│  │      └── spdm_types.rs   (公共类型定义)                 │   │
-│  │                                                         │   │
-│  └─────────────────────────────────────────────────────────┘   │
-│                                                                 │
-│  传输回调 → host_spdm_rsp_ifc.c (TCP socket, port 2323)        │
-│                                                                 │
-└─────────────────────────────────────────────────────────────────┘
+### 1.1 tf-rmm SPDM 通信架构（关键理解）
 
-独立进程（保留 C）:
-┌─────────────────────────────────────────────────────────────────┐
-│  spdm_responder_emu (C 实现，独立进程)                          │
-│  --trans PCI_DOE                                                │
-│  监听 TCP port 2323                                             │
-└─────────────────────────────────────────────────────────────────┘
+**核心要点：Rust SPDM 库不负责底层 socket 通信，只负责协议逻辑。**
+
+```
+┌─────────────────────────────────────────────────────────────────────┐
+│                          tf-rmm 架构分层                             │
+├─────────────────────────────────────────────────────────────────────┤
+│                                                                     │
+│  ┌─────────────────────────────────────────────────────────────┐   │
+│  │  libspdm (C) / rust-spdm-minimal (Rust)                      │   │
+│  │                                                             │   │
+│  │  协议层：                                                    │   │
+│  │  - libspdm_get_version()                                    │   │
+│  │  - libspdm_get_capabilities()                               │   │
+│  │  - libspdm_negotiate_algorithms()                           │   │
+│  │  - libspdm_key_exchange()                                   │   │
+│  │  - libspdm_finish()                                         │   │
+│  │                                                             │   │
+│  │  内部调用：                                                  │   │
+│  │  - libspdm_send_spdm_request() → send_message_func() [回调] │   │
+│  │  - libspdm_receive_spdm_response() → receive_message_func() │   │
+│  │                                                             │   │
+│  └─────────────────────────────────────────────────────────────┘   │
+│                          ↓ 注册回调                                 │
+│  ┌─────────────────────────────────────────────────────────────┐   │
+│  │  el0_app (用户态应用)                                        │   │
+│  │                                                             │   │
+│  │  dev_assign_el0_app.c:                                      │   │
+│  │  - libspdm_register_device_io_func(                        │   │
+│  │        spdm_send_message, spdm_receive_message)             │   │
+│  │                                                             │   │
+│  │  spdm_send_message():                                       │   │
+│  │  - el0_app_service_call(APP_SERVICE_WRITE_TO_NS_BUF)       │   │
+│  │  - el0_app_yield() ← 等待 NS host 处理                      │   │
+│  │                                                             │   │
+│  │  spdm_receive_message():                                    │   │
+│  │  - el0_app_service_call(APP_SERVICE_READ_FROM_NS_BUF)      │   │
+│  │  - el0_app_yield()                                          │   │
+│  │                                                             │   │
+│  └─────────────────────────────────────────────────────────────┘   │
+│                          ↓ NS host 处理                             │
+│  ┌─────────────────────────────────────────────────────────────┐   │
+│  │  host_da.c (Host 层)                                         │   │
+│  │                                                             │   │
+│  │  host_dev_communicate():                                    │   │
+│  │  - host_rmi_dev_communicate() → 调用 RMI                    │   │
+│  │  - 检查 dcomm_exit.flags & REQ_SEND_BIT                     │   │
+│  │  - host_pdev_spdm_rsp_communicate() ← 发送请求              │   │
+│  │                                                             │   │
+│  └─────────────────────────────────────────────────────────────┘   │
+│                          ↓ socket 通信                              │
+│  ┌─────────────────────────────────────────────────────────────┐   │
+│  │  host_spdm_rsp_ifc.c (Socket 层)                             │   │
+│  │                                                             │   │
+│  │  host_spdm_rsp_communicate(spdm_rsp_id, req, rsp):          │   │
+│  │  - host_send_doe_spdm_req() → TCP send                      │   │
+│  │  - host_recv_doe_spdm_rsp() → TCP recv                      │   │
+│  │                                                             │   │
+│  │  TCP 协议：                                                  │   │
+│  │  - send_data32(SOCKET_SPDM_COMMAND_NORMAL)                  │   │
+│  │  - send_data32(SOCKET_TRANSPORT_TYPE_PCI_DOE)               │   │
+│  │  - send_data32(payload_size)                                │   │
+│  │  - send_bytes(doe_header + spdm_payload)                   │   │
+│  │                                                             │   │
+│  │  socket: TCP port 2323, connected to responder_emu         │   │
+│  │                                                             │   │
+│  └─────────────────────────────────────────────────────────────┘   │
+│                          ↓ TCP socket                               │
+│  ┌─────────────────────────────────────────────────────────────┐   │
+│  │  spdm_responder_emu (独立进程, C)                            │   │
+│  │                                                             │   │
+│  │  监听 port 2323                                              │   │
+│  │  接收 DOE 封装的 SPDM 请求                                   │   │
+│  │  处理并返回响应                                              │   │
+│  │                                                             │   │
+│  └─────────────────────────────────────────────────────────────┘   │
+│                                                                     │
+└─────────────────────────────────────────────────────────────────────┘
+```
+
+### 1.2 调用链详细分析
+
+**GET_VERSION 示例流程：**
+
+```
+1. dev_assign_cmds.c:
+   libspdm_init_connection(spdm_context)
+   
+2. libspdm_req_get_version.c:
+   libspdm_try_get_version()
+     → libspdm_send_spdm_request(spdm_context, NULL, request_size, request)
+       → spdm_context->send_message(spdm_context, request_size, request, timeout)
+         ↑ 这是注册的回调
+
+3. dev_assign_el0_app.c (回调实现):
+   spdm_send_message(spdm_context, request_size, request, timeout):
+     → el0_app_service_call(APP_SERVICE_WRITE_TO_NS_BUF, ...)
+       → el0_app_yield()  ← 暂停，等待 NS host
+
+4. host_da.c (NS host 处理):
+   host_dev_communicate():
+     → host_rmi_dev_communicate()  ← RMI SMC
+     → dcomm_exit.flags |= REQ_SEND_BIT
+     → host_pdev_spdm_rsp_communicate(h_pdev, dcomm_enter, dcomm_exit)
+
+5. host_spdm_rsp_ifc.c:
+   host_pdev_spdm_rsp_communicate():
+     → host_spdm_rsp_communicate(spdm_rsp_id, req_buf, req_len, rsp_buf, rsp_len)
+       → host_send_doe_spdm_req():
+         - send_data32(sock_fd, SOCKET_SPDM_COMMAND_NORMAL)
+         - send_data32(sock_fd, SOCKET_TRANSPORT_TYPE_PCI_DOE)
+         - send_data32(sock_fd, payload_size)
+         - send_bytes(sock_fd, doe_header)
+         - send_bytes(sock_fd, spdm_request)
+         
+       → host_recv_doe_spdm_rsp():
+         - recv_data32(sock_fd, &command)
+         - recv_data32(sock_fd, &transport_type)
+         - recv_data32(sock_fd, &payload_size)
+         - recv_bytes(sock_fd, doe_header)
+         - recv_bytes(sock_fd, spdm_response)
+
+6. spdm_responder_emu (独立进程):
+   接收 TCP 数据 → 解析 DOE → 处理 SPDM GET_VERSION → 返回 VERSION
+
+7. 返回路径 (反向):
+   host_spdm_rsp_communicate() 返回 → 
+   host_pdev_spdm_rsp_communicate() 返回 → 
+   dcomm_enter.status = RESPONSE → 
+   el0_app 从 yield 恢复 → 
+   spdm_receive_message() 读取响应 → 
+   libspdm_try_get_version() 解析 VERSION
+```
+
+### 1.3 Rust SPDM 库的角色
+
+**Rust 只需实现：**
+- 协议层逻辑（GET_VERSION/CAPS/ALGO/KEY_EX/FINISH 等）
+- 存储注册的回调函数指针
+- 在协议函数中调用回调
+
+**Rust 不需实现：**
+- Socket 通信（由 host_spdm_rsp_ifc.c 负责）
+- DOE 封装（由 host_da.c 调用 host_spdm_rsp_ifc.c）
+- el0_app_service_call（由 C 的回调实现）
+
+### 1.4 关键代码位置
+
+| 文件 | 职责 | Rust 需要交互的部分 |
+|------|------|---------------------|
+| `ext/libspdm/library/spdm_requester_lib/*.c` | SPDM 协议实现 | Rust FFI 替代 |
+| `app/device_assignment/el0_app/src/dev_assign_el0_app.c` | 注册回调、回调实现 | Rust 通过 FFI 接收回调指针 |
+| `plat/host/host_build/src/host_da.c` | Host 层设备通信 | 不交互 |
+| `plat/host/host_build/src/host_spdm_rsp_ifc.c` | TCP socket 通信 | 不交互 |
+
+### 1.5 Rust FFI 实现要点
+
+```rust
+// 存储回调指针
+static mut GLOBAL_CONTEXT: SpdmContextState = SpdmContextState {
+    send_message_func: AtomicPtr::new(null),
+    receive_message_func: AtomicPtr::new(null),
+    ...
+};
+
+// 注册回调
+pub extern "C" fn libspdm_register_device_io_func(
+    _context: libspdm_context_t,
+    send_message_func: *mut c_void,
+    receive_message_func: *mut c_void,
+) -> libspdm_return_t {
+    let state = get_context_state();
+    state.send_message_func.store(send_message_func, Ordering::SeqCst);
+    state.receive_message_func.store(receive_message_func, Ordering::SeqCst);
+    LIBSPDM_STATUS_SUCCESS
+}
+
+// 在协议函数中调用回调
+pub extern "C" fn libspdm_init_connection(context: libspdm_context_t) -> libspdm_return_t {
+    // 构造 GET_VERSION 请求
+    let request = [SPDM_VERSION_1_2, SPDM_GET_VERSION, 0, 0];
+    
+    // 调用注册的回调
+    let send_func = state.send_message_func.load(Ordering::SeqCst);
+    let func: SendMessageFunc = transmute(send_func);
+    func(context, request.len(), &request, 0);
+    
+    // 等待并接收响应（通过 receive_message_func）
+    ...
+}
 ```
 
 ---
