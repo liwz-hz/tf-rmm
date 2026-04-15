@@ -1,0 +1,32 @@
+[package]
+name = "rust-spdm-minimal"
+version = "0.1.0"
+edition = "2021"
+license = "BSD-3-Clause"
+
+[lib]
+name = "rust_spdm_minimal"
+crate-type = ["staticlib", "cdylib"]
+
+[dependencies]
+sha2 = "0.10"
+aes-gcm = "0.10"
+p256 = { version = "0.13", features = ["ecdh", "ecdsa"] }
+p384 = { version = "0.13", features = ["ecdh", "ecdsa"] }
+hkdf = "0.12"
+rand_core = "0.6"
+zeroize = { version = "1.6", features = ["derive"] }
+byteorder = "1.5"
+log = "0.4"
+
+[build-dependencies]
+cbindgen = "0.26"
+
+[features]
+default = ["std"]
+std = []
+no_std = []
+
+[profile.release]
+opt-level = 3
+lto = true
