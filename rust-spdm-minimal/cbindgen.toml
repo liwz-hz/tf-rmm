@@ -1,0 +1,14 @@
+[parse]
+parse_deps = false
+
+[export]
+include = ["SpdmContext", "SpdmStatus", "ConnectionState", "SessionState"]
+
+[fn]
+sort_by = ["Name"]
+
+[struct]
+rename_fields = "None"
+
+[enum]
+rename_variants = "None"
