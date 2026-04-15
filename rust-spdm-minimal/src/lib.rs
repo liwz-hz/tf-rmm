@@ -8,6 +8,7 @@ pub mod error;
 pub mod message;
 pub mod protocol;
 pub mod crypto;
+pub mod session;
 
 pub use context::SpdmContext;
 pub use error::{SpdmStatus, SpdmResult, is_error};
@@ -18,6 +19,9 @@ pub use protocol::{
     NegotiateAlgorithmsRequest, AlgorithmsResponse,
     GetDigestsRequest, DigestsResponse,
     GetCertificateRequest, CertificateResponse,
+    KeyExchangeRequest, KeyExchangeResponse,
+    FinishRequest, FinishResponse,
+    EndSessionRequest, EndSessionResponse,
 };
 pub use crypto::{
     sha256, sha384, SHA256_SIZE, SHA384_SIZE, MAX_HASH_SIZE,
@@ -26,4 +30,9 @@ pub use crypto::{
     ecdsa_verify_p256, ecdsa_verify_p384,
     hkdf_extract_sha256, hkdf_expand_sha256, hkdf_extract_sha384, hkdf_expand_sha384,
     random_bytes,
+};
+pub use session::{
+    SessionState, SessionInfo, SessionContext,
+    derive_master_secret, derive_encryption_key, derive_mac_key,
+    SecuredMessage, encrypt_message, decrypt_message,
 };
