@@ -13,7 +13,7 @@
 use crate::error::{SpdmStatus, SpdmResult};
 
 /// SPDM Version encoding
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Default)]
 #[repr(u8)]
 pub enum SpdmVersion {
     /// SPDM 1.0
