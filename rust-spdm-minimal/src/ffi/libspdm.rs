@@ -106,6 +106,10 @@ struct SpdmContext {
     key_exchange_rsp_len: AtomicU32,
     request_handshake_secret: [AtomicU8; 48],
     request_finished_key: [AtomicU8; 48],
+    response_handshake_secret: [AtomicU8; 48],
+    response_finished_key: [AtomicU8; 48],
+    responder_hmac: [AtomicU8; 48],  // responder's verify_data for TH_curr
+    responder_hmac_len: AtomicU32,  // 0 = no HMAC, 48 = HMAC included
     // message_a transcript storage (VERSION + CAPABILITIES + ALGORITHMS)
     message_a_data: [AtomicU8; 4096],
     message_a_len: AtomicU32,
@@ -175,6 +179,10 @@ static mut SPDM_CTX: SpdmContext = SpdmContext {
     key_exchange_rsp_len: AtomicU32::new(0),
     request_handshake_secret: [const { AtomicU8::new(0) }; 48],
     request_finished_key: [const { AtomicU8::new(0) }; 48],
+    response_handshake_secret: [const { AtomicU8::new(0) }; 48],
+    response_finished_key: [const { AtomicU8::new(0) }; 48],
+    responder_hmac: [const { AtomicU8::new(0) }; 48],
+    responder_hmac_len: AtomicU32::new(0),
     message_a_data: [const { AtomicU8::new(0) }; 4096],
     message_a_len: AtomicU32::new(0),
 };
@@ -585,6 +593,9 @@ pub extern "C" fn libspdm_init_connection(context: libspdm_context_t) -> libspdm
             return LIBSPDM_STATUS_ERROR;
         }
 
+        // Clear message_a transcript at start
+        SPDM_CTX.message_a_len.store(0, Ordering::SeqCst);
+        
         let negotiated_ver = SPDM_CTX.spdm_version.load(Ordering::SeqCst);
         // GET_VERSION must always use version 1.0 (0x10), per SPDM spec
         let version_byte: u8 = 0x10;
@@ -609,6 +620,20 @@ pub extern "C" fn libspdm_init_connection(context: libspdm_context_t) -> libspdm
             return LIBSPDM_STATUS_ERROR;
         }
 
+        // SAVE REQUEST BEFORE recv() overwrites the buffer!
+        // The sender buffer may be reused for receiving, so we must save request bytes now.
+        let msg_a_len = SPDM_CTX.message_a_len.load(Ordering::SeqCst) as usize;
+        // Save GET_VERSION request bytes (will be overwritten by recv)
+        let saved_request_bytes = [
+            *sender_buf.add(0),
+            *sender_buf.add(1),
+            *sender_buf.add(2),
+            *sender_buf.add(3),
+        ];
+        debug_print!("  saved request bytes for message_a: %02x %02x %02x %02x",
+            saved_request_bytes[0] as u32, saved_request_bytes[1] as u32,
+            saved_request_bytes[2] as u32, saved_request_bytes[3] as u32);
+
         let receiver_buf = call_acquire_receiver(context);
         if receiver_buf.is_null() {
             call_release_sender(context, sender_buf as *mut c_void);
@@ -621,6 +646,20 @@ pub extern "C" fn libspdm_init_connection(context: libspdm_context_t) -> libspdm
         
         let recv_ret = call_recv(context, &mut recv_ptr, &mut recv_size);
         debug_print!("  recv returned %u, size=%zu", recv_ret, recv_size);
+        
+        // Save VERSION request+response to message_a transcript (BEFORE releasing buffers)
+        // message_a = GET_VERSION req (4 bytes) + VERSION rsp (recv_size bytes)
+        // Use saved_request_bytes since sender_buf may now contain response data
+        for i in 0..4 {
+            if msg_a_len + i < 4096 {
+                SPDM_CTX.message_a_data[msg_a_len + i].store(saved_request_bytes[i], Ordering::SeqCst);
+            }
+        }
+        for i in 0..recv_size.min(4096 - msg_a_len - 4) {
+            SPDM_CTX.message_a_data[msg_a_len + 4 + i].store(*receiver_buf.add(i), Ordering::SeqCst);
+        }
+        SPDM_CTX.message_a_len.store((msg_a_len + 4 + recv_size) as u32, Ordering::SeqCst);
+        debug_print!("  saved VERSION to message_a: req=4, rsp=%zu, total=%zu", recv_size, msg_a_len + 4 + recv_size);
 
         call_release_sender(context, sender_buf as *mut c_void);
         call_release_receiver(context, receiver_buf as *mut c_void);
@@ -762,6 +801,12 @@ pub extern "C" fn libspdm_init_connection(context: libspdm_context_t) -> libspdm
             return LIBSPDM_STATUS_ERROR;
         }
         
+        // Save CAPABILITIES request bytes BEFORE recv overwrites the buffer
+        let msg_a_len_before_caps = SPDM_CTX.message_a_len.load(Ordering::SeqCst) as usize;
+        let saved_caps_req_bytes: Vec<u8> = (0..caps_req_size.min(4096))
+            .map(|i| *sender_buf2.add(i))
+            .collect();
+        
         // Receive CAPABILITIES response
         let receiver_buf2 = call_acquire_receiver(context);
         if receiver_buf2.is_null() {
@@ -773,6 +818,16 @@ pub extern "C" fn libspdm_init_connection(context: libspdm_context_t) -> libspdm
         let mut recv_size2: usize = 4096;
         let mut recv_ptr2: *mut c_void = receiver_buf2 as *mut c_void;
         let recv_ret2 = call_recv(context, &mut recv_ptr2, &mut recv_size2);
+        
+        // Save CAPABILITIES request+response to message_a
+        for i in 0..saved_caps_req_bytes.len().min(4096 - msg_a_len_before_caps) {
+            SPDM_CTX.message_a_data[msg_a_len_before_caps + i].store(saved_caps_req_bytes[i], Ordering::SeqCst);
+        }
+        for i in 0..recv_size2.min(4096 - msg_a_len_before_caps - caps_req_size) {
+            SPDM_CTX.message_a_data[msg_a_len_before_caps + caps_req_size + i].store(*receiver_buf2.add(i), Ordering::SeqCst);
+        }
+        SPDM_CTX.message_a_len.store((msg_a_len_before_caps + caps_req_size + recv_size2) as u32, Ordering::SeqCst);
+        debug_print!("  saved CAPABILITIES to message_a: req=%zu, rsp=%zu, total=%zu", caps_req_size, recv_size2, msg_a_len_before_caps + caps_req_size + recv_size2);
         
         call_release_sender(context, sender_buf2 as *mut c_void);
         call_release_receiver(context, receiver_buf2 as *mut c_void);
@@ -921,6 +976,12 @@ pub extern "C" fn libspdm_init_connection(context: libspdm_context_t) -> libspdm
             return LIBSPDM_STATUS_ERROR;
         }
         
+        // Save ALGORITHMS request bytes BEFORE recv overwrites the buffer
+        let msg_a_len_before_alg = SPDM_CTX.message_a_len.load(Ordering::SeqCst) as usize;
+        let saved_alg_req_bytes: Vec<u8> = (0..alg_req_size.min(4096))
+            .map(|i| *sender_buf3.add(i))
+            .collect();
+        
         // Receive ALGORITHMS response
         let receiver_buf3 = call_acquire_receiver(context);
         if receiver_buf3.is_null() {
@@ -932,6 +993,16 @@ pub extern "C" fn libspdm_init_connection(context: libspdm_context_t) -> libspdm
         let mut recv_size3: usize = 4096;
         let mut recv_ptr3: *mut c_void = receiver_buf3 as *mut c_void;
         let recv_ret3 = call_recv(context, &mut recv_ptr3, &mut recv_size3);
+        
+        // Save ALGORITHMS request+response to message_a
+        for i in 0..saved_alg_req_bytes.len().min(4096 - msg_a_len_before_alg) {
+            SPDM_CTX.message_a_data[msg_a_len_before_alg + i].store(saved_alg_req_bytes[i], Ordering::SeqCst);
+        }
+        for i in 0..recv_size3.min(4096 - msg_a_len_before_alg - alg_req_size) {
+            SPDM_CTX.message_a_data[msg_a_len_before_alg + alg_req_size + i].store(*receiver_buf3.add(i), Ordering::SeqCst);
+        }
+        SPDM_CTX.message_a_len.store((msg_a_len_before_alg + alg_req_size + recv_size3) as u32, Ordering::SeqCst);
+        debug_print!("  saved ALGORITHMS to message_a: req=%zu, rsp=%zu, total=%zu", alg_req_size, recv_size3, msg_a_len_before_alg + alg_req_size + recv_size3);
         
         call_release_sender(context, sender_buf3 as *mut c_void);
         call_release_receiver(context, receiver_buf3 as *mut c_void);
@@ -1308,6 +1379,10 @@ pub extern "C" fn libspdm_get_certificate(
                     }
                     debug_print!("  copied %u bytes, total_offset=%zu", portion_length as u32, total_offset + portion_length as usize);
                 }
+                // Also save to internal cert_chain_buffer for hash calculation
+                for i in 0..(portion_length as usize).min(65536 - total_offset) {
+                    SPDM_CTX.cert_chain_buffer[total_offset + i].store(*decoded_buf.add(8 + i), Ordering::SeqCst);
+                }
                 total_offset += portion_length as usize;
             }
             
@@ -1321,8 +1396,32 @@ pub extern "C" fn libspdm_get_certificate(
         }
         
         *cert_chain_size = total_offset;
+        SPDM_CTX.cert_chain_len.store(total_offset as u32, Ordering::SeqCst);
         debug_print!("  === LOOP END: total_chunks=%u, total_size=%zu ===", chunk_num, total_offset);
         debug_print!("  get_certificate SUCCESS: total_size=%zu", total_offset);
+        
+        // Calculate hash of complete cert_chain (including SPDM header and root cert hash)
+        // This matches what responder uses for TH calculation
+        let base_hash_algo = SPDM_CTX.base_hash_algo.load(Ordering::SeqCst);
+        let hash_size = libspdm_get_hash_size(base_hash_algo);
+        if total_offset > 0 && hash_size > 0 {
+            let mut cert_chain_data = Vec::with_capacity(total_offset);
+            for i in 0..total_offset.min(65536) {
+                cert_chain_data.push(SPDM_CTX.cert_chain_buffer[i].load(Ordering::SeqCst));
+            }
+            match sha384(&cert_chain_data) {
+                Ok(hash) => {
+                    for i in 0..hash_size.min(48) {
+                        SPDM_CTX.cert_chain_hash[i].store(hash[i], Ordering::SeqCst);
+                    }
+                    SPDM_CTX.cert_chain_hash_len.store(hash_size as u32, Ordering::SeqCst);
+                    debug_print!("  computed cert_chain_hash (full chain): len=%zu", hash_size);
+                }
+                Err(_) => {
+                    debug_print!("  ERROR: cert_chain hash computation failed");
+                }
+            }
+        }
     }
     
     LIBSPDM_STATUS_SUCCESS
@@ -1665,18 +1764,41 @@ pub extern "C" fn libspdm_key_exchange(
             return recv_ret;
         }
         
-        debug_print!("  recv size=%zu", recv_size);
+        debug_print!("  recv size=%zu (raw transport data)", recv_size);
         
-        // Parse KEY_EXCHANGE_RSP:
-        // Header(4) + rsp_session_id(2) + mut_auth_requested(1) + slot_id_param(1) + random(32) + exchange_data + meas_hash + opaque + signature + hmac
-        let min_rsp_size = 4 + 2 + 1 + 1 + 32 + dhe_key_size;
-        if recv_size < min_rsp_size {
-            debug_print!("  ERROR: response too small (%zu < %zu)", recv_size, min_rsp_size);
+        // Decode transport header to get actual SPDM message
+        let mut msg_size: usize = 0;
+        let mut msg_ptr: *mut c_void = core::ptr::null_mut();
+        let decode_ret = call_transport_decode(
+            context,
+            receiver_buf as *mut c_void,
+            recv_size,
+            &mut msg_size,
+            &mut msg_ptr,
+        );
+        
+        if decode_ret != LIBSPDM_STATUS_SUCCESS {
+            debug_print!("  ERROR: transport_decode failed for KEY_EXCHANGE_RSP");
             call_release_receiver(context, receiver_buf as *mut c_void);
             return LIBSPDM_STATUS_ERROR;
         }
         
-        let rsp_code = *receiver_buf.add(1);
+        // Use decoded message (msg_ptr) or raw buffer if decode returned null
+        let decoded_buf = if msg_ptr.is_null() { receiver_buf } else { msg_ptr as *mut u8 };
+        let decoded_size = if msg_size == 0 { recv_size } else { msg_size };
+        
+        debug_print!("  decoded SPDM message size=%zu", decoded_size);
+        
+        // Parse KEY_EXCHANGE_RSP:
+        // Header(4) + rsp_session_id(2) + mut_auth_requested(1) + slot_id_param(1) + random(32) + exchange_data + meas_hash + opaque + signature + hmac
+        let min_rsp_size = 4 + 2 + 1 + 1 + 32 + dhe_key_size;
+        if decoded_size < min_rsp_size {
+            debug_print!("  ERROR: response too small (%zu < %zu)", decoded_size, min_rsp_size);
+            call_release_receiver(context, receiver_buf as *mut c_void);
+            return LIBSPDM_STATUS_ERROR;
+        }
+        
+        let rsp_code = *decoded_buf.add(1);
         
         if rsp_code != SPDM_KEY_EXCHANGE_RSP {
             debug_print!("  ERROR: wrong response code 0x%x (expected 0x%x)", rsp_code, SPDM_KEY_EXCHANGE_RSP);
@@ -1685,8 +1807,8 @@ pub extern "C" fn libspdm_key_exchange(
         }
         
         // Extract rsp_session_id (bytes 4-5)
-        let b0 = *receiver_buf.add(4);
-        let b1 = *receiver_buf.add(5);
+        let b0 = *decoded_buf.add(4);
+        let b1 = *decoded_buf.add(5);
         let rsp_session_id = (b0 as u16) | ((b1 as u16) << 8);
         
         debug_print!("  rsp_session_id=0x%x", rsp_session_id);
@@ -1702,21 +1824,61 @@ pub extern "C" fn libspdm_key_exchange(
         
         // Extract heartbeat_period from mut_auth_requested field (byte 6)
         if !heartbeat_period.is_null() {
-            let mut_auth = *receiver_buf.add(6);
+            let mut_auth = *decoded_buf.add(6);
             *heartbeat_period = 0; // heartbeat not in this field, but we return 0
         }
         
         // Extract responder_random (bytes 8-39, 32 bytes)
         for i in 0..32 {
-            SPDM_CTX.responder_random[i].store(*receiver_buf.add(8 + i), Ordering::SeqCst);
+            SPDM_CTX.responder_random[i].store(*decoded_buf.add(8 + i), Ordering::SeqCst);
         }
         
         // Extract responder_dhe_pubkey (bytes 40-135, 96 bytes for P-384)
         for i in 0..96 {
-            SPDM_CTX.responder_dhe_pubkey[i].store(*receiver_buf.add(40 + i), Ordering::SeqCst);
+            SPDM_CTX.responder_dhe_pubkey[i].store(*decoded_buf.add(40 + i), Ordering::SeqCst);
         }
         
         debug_print!("  extracted responder_random and dhe_pubkey");
+        
+        // Parse KEY_EXCHANGE_RSP structure to calculate actual SPDM message size
+        // Structure: Header(4) + rsp_session_id(2) + mut_auth(1) + slot_id(1) + random(32) + dhe_pubkey(96) + opaque_length(2) + opaque_data + signature(96) + HMAC(48)
+        // Offset 136: opaque_length (2 bytes, little endian)
+        let opaque_offset = 4 + 2 + 1 + 1 + 32 + dhe_key_size;  // = 136
+        if decoded_size < opaque_offset + 2 {
+            debug_print!("  ERROR: response too small to contain opaque_length");
+            call_release_receiver(context, receiver_buf as *mut c_void);
+            return LIBSPDM_STATUS_ERROR;
+        }
+        let opaque_length = (*decoded_buf.add(opaque_offset) as u16) |
+                            ((*decoded_buf.add(opaque_offset + 1) as u16) << 8);
+        debug_print!("  opaque_length=%u", opaque_length as u32);
+        
+        // Calculate actual SPDM message size
+        // For ECDSA-384: signature_size = 96, HMAC_size = 48
+        // responder may or may not include HMAC based on HANDSHAKE_IN_THE_CLEAR capability
+        // We determine actual size by parsing: check if data after signature matches HMAC pattern
+        let sig_size = 96;  // ECDSA-P384 signature size
+        let hmac_size = 48;  // SHA-384 HMAC size
+        let base_rsp_size = opaque_offset + 2 + opaque_length as usize;  // up to end of opaque_data
+        
+        // Calculate expected sizes with and without HMAC
+        let rsp_size_with_hmac = base_rsp_size + sig_size + hmac_size;
+        let rsp_size_no_hmac = base_rsp_size + sig_size;
+        
+        // Determine actual size: if decoded_size matches with_hmac or no_hmac exactly, use that
+        // Otherwise, use decoded_size (which may have DOE padding)
+        let actual_rsp_size = if decoded_size == rsp_size_with_hmac || decoded_size == rsp_size_no_hmac {
+            decoded_size
+        } else if decoded_size > rsp_size_no_hmac && decoded_size <= rsp_size_with_hmac + 4 {
+            // DOE padding case: responder sent no_hmac size, DOE padded to DW alignment
+            // Use the calculated size without HMAC (responder doesn't support HANDSHAKE_IN_THE_CLEAR)
+            rsp_size_no_hmac
+        } else {
+            decoded_size
+        };
+        
+        debug_print!("  actual SPDM message size: %zu (decoded=%zu, expected_with_hmac=%zu, expected_no_hmac=%zu)", 
+                     actual_rsp_size, decoded_size, rsp_size_with_hmac, rsp_size_no_hmac);
         
         // Compute shared secret using saved ECDH keypair
         if ECDH_KEYPAIR.is_some() {
@@ -1727,38 +1889,96 @@ pub extern "C" fn libspdm_key_exchange(
                 responder_sec1_pubkey.push(SPDM_CTX.responder_dhe_pubkey[i].load(Ordering::SeqCst));
             }
             
-            match keypair.shared_secret(&responder_sec1_pubkey) {
-                Ok(shared_secret) => {
-                    debug_print!("  computed shared secret: len=%zu", shared_secret.len());
-                    
-                    // Save KEY_EXCHANGE response data for TH1 calculation
-                    for i in 0..recv_size.min(2048) {
-                        SPDM_CTX.key_exchange_rsp_data[i].store(*receiver_buf.add(i), Ordering::SeqCst);
+match keypair.shared_secret(&responder_sec1_pubkey) {
+                    Ok(shared_secret) => {
+                        debug_print!("  shared_secret len=%zu first8=%02x%02x%02x%02x", shared_secret.len(),
+                            shared_secret[0], shared_secret[1], shared_secret[2], shared_secret[3]);
+                        
+                        // Save KEY_EXCHANGE response data for TH1 calculation (use actual SPDM size, not DOE padded)
+                    for i in 0..actual_rsp_size.min(2048) {
+                        SPDM_CTX.key_exchange_rsp_data[i].store(*decoded_buf.add(i), Ordering::SeqCst);
                     }
-                    SPDM_CTX.key_exchange_rsp_len.store(recv_size as u32, Ordering::SeqCst);
-                    debug_print!("  saved KEY_EXCHANGE response: len=%zu", recv_size);
+                    SPDM_CTX.key_exchange_rsp_len.store(actual_rsp_size as u32, Ordering::SeqCst);
+                    debug_print!("  saved KEY_EXCHANGE response: len=%zu (actual SPDM size)", actual_rsp_size);
                     
                     // Compute handshake_secret = HKDF-Extract(salt=zero, ikm=shared_secret)
                     let zero_salt = [0u8; 48];
                     match hkdf_extract_sha384(&zero_salt, &shared_secret) {
                         Ok(handshake_secret) => {
+                            debug_print!("  handshake_secret computed len=%zu first8=%02x%02x%02x%02x", handshake_secret.len(),
+                                handshake_secret[0], handshake_secret[1], handshake_secret[2], handshake_secret[3]);
                             for i in 0..48 {
                                 SPDM_CTX.handshake_secret[i].store(handshake_secret[i], Ordering::SeqCst);
                             }
-                            debug_print!("  computed handshake_secret");
+                            debug_print!("  stored handshake_secret");
                             
-                            // Compute TH1 = SHA-384(KEY_EXCHANGE req + rsp)
+                            // Compute TH1 = SHA-384(message_a + cert_chain_hash + KEY_EXCHANGE req + rsp(no_sig) + signature)
+                            let msg_a_len = SPDM_CTX.message_a_len.load(Ordering::SeqCst) as usize;
                             let req_len = SPDM_CTX.key_exchange_req_len.load(Ordering::SeqCst) as usize;
                             let rsp_len = SPDM_CTX.key_exchange_rsp_len.load(Ordering::SeqCst) as usize;
-                            let mut transcript_data = Vec::with_capacity(req_len + rsp_len);
+                            let cert_hash_len = SPDM_CTX.cert_chain_hash_len.load(Ordering::SeqCst) as usize;
+                            
+                            debug_print!("  TH1 transcript sizes: msg_a=%zu cert_hash=%zu ke_req=%zu ke_rsp=%zu", 
+                                         msg_a_len, cert_hash_len, req_len, rsp_len);
+                            debug_print!("  message_a first4=%02x%02x%02x%02x", 
+                                SPDM_CTX.message_a_data[0].load(Ordering::SeqCst),
+                                SPDM_CTX.message_a_data[1].load(Ordering::SeqCst),
+                                SPDM_CTX.message_a_data[2].load(Ordering::SeqCst),
+                                SPDM_CTX.message_a_data[3].load(Ordering::SeqCst));
+                            debug_print!("  cert_chain_hash first4=%02x%02x%02x%02x", 
+                                SPDM_CTX.cert_chain_hash[0].load(Ordering::SeqCst),
+                                SPDM_CTX.cert_chain_hash[1].load(Ordering::SeqCst),
+                                SPDM_CTX.cert_chain_hash[2].load(Ordering::SeqCst),
+                                SPDM_CTX.cert_chain_hash[3].load(Ordering::SeqCst));
+                            debug_print!("  ke_req first4=%02x%02x%02x%02x", 
+                                SPDM_CTX.key_exchange_req_data[0].load(Ordering::SeqCst),
+                                SPDM_CTX.key_exchange_req_data[1].load(Ordering::SeqCst),
+                                SPDM_CTX.key_exchange_req_data[2].load(Ordering::SeqCst),
+                                SPDM_CTX.key_exchange_req_data[3].load(Ordering::SeqCst));
+                            debug_print!("  ke_rsp first4=%02x%02x%02x%02x", 
+                                SPDM_CTX.key_exchange_rsp_data[0].load(Ordering::SeqCst),
+                                SPDM_CTX.key_exchange_rsp_data[1].load(Ordering::SeqCst),
+                                SPDM_CTX.key_exchange_rsp_data[2].load(Ordering::SeqCst),
+                                SPDM_CTX.key_exchange_rsp_data[3].load(Ordering::SeqCst));
+                            
+                            // responder splits KEY_EXCHANGE_RSP into: rsp(no_sig) + signature
+                            // rsp(no_sig) = base_rsp_size = 136 + 2 + opaque_length = 148 bytes
+                            // signature = 96 bytes
+                            let rsp_no_sig_len = base_rsp_size;  // 148 bytes
+                            let signature_len = sig_size;  // 96 bytes
+                            
+                            let mut transcript_data = Vec::with_capacity(msg_a_len + cert_hash_len + req_len + rsp_no_sig_len + signature_len);
+                            
+                            // Append message_a
+                            for i in 0..msg_a_len.min(4096) {
+                                transcript_data.push(SPDM_CTX.message_a_data[i].load(Ordering::SeqCst));
+                            }
+                            // Append cert_chain_hash
+                            if cert_hash_len > 0 {
+                                for i in 0..cert_hash_len.min(64) {
+                                    transcript_data.push(SPDM_CTX.cert_chain_hash[i].load(Ordering::SeqCst));
+                                }
+                            }
+                            // Append KEY_EXCHANGE req
                             for i in 0..req_len.min(2048) {
                                 transcript_data.push(SPDM_CTX.key_exchange_req_data[i].load(Ordering::SeqCst));
                             }
-                            for i in 0..rsp_len.min(2048) {
+                            // Append KEY_EXCHANGE rsp (no signature)
+                            for i in 0..rsp_no_sig_len.min(2048) {
                                 transcript_data.push(SPDM_CTX.key_exchange_rsp_data[i].load(Ordering::SeqCst));
                             }
+                            // Append signature (after rsp_no_sig)
+                            for i in 0..signature_len.min(128) {
+                                transcript_data.push(SPDM_CTX.key_exchange_rsp_data[rsp_no_sig_len + i].load(Ordering::SeqCst));
+                            }
+                            debug_print!("  TH1 transcript: msg_a=%zu + cert_hash=%zu + ke_req=%zu + ke_rsp=%zu", 
+                                         msg_a_len, cert_hash_len, req_len, rsp_no_sig_len + signature_len);
+                            
                             let th1 = match sha384(&transcript_data) {
-                                Ok(h) => h,
+                                Ok(h) => {
+                                    debug_print!("  TH1 computed first8=%02x%02x%02x%02x", h[0], h[1], h[2], h[3]);
+                                    h
+                                },
                                 Err(_) => {
                                     debug_print!("  ERROR: TH1 hash failed");
                                     return LIBSPDM_STATUS_ERROR;
@@ -1784,6 +2004,8 @@ pub extern "C" fn libspdm_key_exchange(
                             
                             match hkdf_expand_sha384(&handshake_secret, &bin_str1, 48) {
                                 Ok(req_hs_secret) => {
+                                    debug_print!("  request_handshake_secret first8=%02x%02x%02x%02x",
+                                        req_hs_secret[0], req_hs_secret[1], req_hs_secret[2], req_hs_secret[3]);
                                     for i in 0..48 {
                                         SPDM_CTX.request_handshake_secret[i].store(req_hs_secret[i], Ordering::SeqCst);
                                     }
@@ -1805,6 +2027,57 @@ pub extern "C" fn libspdm_key_exchange(
                                                 SPDM_CTX.request_finished_key[i].store(finished_key[i], Ordering::SeqCst);
                                             }
                                             debug_print!("  stored request_finished_key");
+                                            
+                                            // Derive response_handshake_secret
+                                            // bin_str2 = length(48) + "spdm1.2 rsp hs data" + TH1
+                                            let bin_str2: Vec<u8> = [
+                                                48, 0,
+                                                b's', b'p', b'd', b'm',
+                                                b'0' + major, b'.', b'0' + minor, b' ',
+                                                b'r', b's', b'p', b' ',
+                                                b'h', b's', b' ', b'd',
+                                                b'a', b't', b'a',
+                                            ].iter().cloned().chain(th1.iter().cloned()).collect();
+                                            
+                                            match hkdf_expand_sha384(&handshake_secret, &bin_str2, 48) {
+                                                Ok(rsp_hs_secret) => {
+                                                    for i in 0..48 {
+                                                        SPDM_CTX.response_handshake_secret[i].store(rsp_hs_secret[i], Ordering::SeqCst);
+                                                    }
+                                                    debug_print!("  stored response_handshake_secret");
+                                                    
+                                                    // Derive response_finished_key
+                                                    match hkdf_expand_sha384(&rsp_hs_secret, &bin_str7, 48) {
+                                                        Ok(rsp_finished_key) => {
+                                                            for i in 0..48 {
+                                                                SPDM_CTX.response_finished_key[i].store(rsp_finished_key[i], Ordering::SeqCst);
+                                                            }
+                                                            debug_print!("  stored response_finished_key");
+                                                            
+                                                            // Calculate responder HMAC (verify_data)
+                                                            // TH1_hash = SHA384(TH1_transcript)
+                                                            let verify_data = match hmac_sha384(&rsp_finished_key, &th1) {
+                                                                Ok(h) => h,
+                                                                Err(_) => {
+                                                                    debug_print!("  ERROR: responder HMAC failed");
+                                                                    return LIBSPDM_STATUS_ERROR;
+                                                                }
+                                                            };
+                                                            for i in 0..48 {
+                                                                SPDM_CTX.responder_hmac[i].store(verify_data[i], Ordering::SeqCst);
+                                                            }
+                                                            SPDM_CTX.responder_hmac_len.store(48, Ordering::SeqCst);
+                                                            debug_print!("  stored responder HMAC (verify_data)");
+                                                        }
+                                                        Err(_) => {
+                                                            debug_print!("  ERROR: response_finished_key derivation failed");
+                                                        }
+                                                    }
+                                                }
+                                                Err(_) => {
+                                                    debug_print!("  ERROR: response_handshake_secret derivation failed");
+                                                }
+                                            }
                                         }
                                         Err(_) => {
                                             debug_print!("  ERROR: finished_key derivation failed");
@@ -1877,21 +2150,65 @@ pub extern "C" fn libspdm_finish(
         offset += 1;
         
         // Compute verify_data (HMAC)
-        // TH_curr = SHA-384(KEY_EXCHANGE req + KEY_EXCHANGE rsp + FINISH req header)
+        // TH_curr = SHA-384(message_a + cert_chain_hash + KEY_EXCHANGE req + KEY_EXCHANGE rsp + FINISH req header)
+        let msg_a_len = SPDM_CTX.message_a_len.load(Ordering::SeqCst) as usize;
+        let cert_hash_len = SPDM_CTX.cert_chain_hash_len.load(Ordering::SeqCst) as usize;
         let req_len = SPDM_CTX.key_exchange_req_len.load(Ordering::SeqCst) as usize;
         let rsp_len = SPDM_CTX.key_exchange_rsp_len.load(Ordering::SeqCst) as usize;
-        let mut transcript_data = Vec::with_capacity(req_len + rsp_len + 4);
+        let mut transcript_data = Vec::with_capacity(msg_a_len + cert_hash_len + req_len + rsp_len + 4);
+        
+        // Append message_a (VERSION + CAPABILITIES + ALGORITHMS)
+        for i in 0..msg_a_len.min(4096) {
+            transcript_data.push(SPDM_CTX.message_a_data[i].load(Ordering::SeqCst));
+        }
+        debug_print!("  appended message_a: len=%zu", msg_a_len);
+        
+        // Append cert_chain_hash (responder's certificate chain hash)
+        if cert_hash_len > 0 {
+            for i in 0..cert_hash_len.min(64) {
+                transcript_data.push(SPDM_CTX.cert_chain_hash[i].load(Ordering::SeqCst));
+            }
+            debug_print!("  appended cert_chain_hash: len=%zu", cert_hash_len);
+        }
+        
+        // Append KEY_EXCHANGE request
         for i in 0..req_len.min(2048) {
             transcript_data.push(SPDM_CTX.key_exchange_req_data[i].load(Ordering::SeqCst));
         }
-        for i in 0..rsp_len.min(2048) {
+        // Append KEY_EXCHANGE response (no signature) - match responder's message_k structure
+        // message_k = KE_rsp_no_sig + signature (split by responder)
+        let rsp_no_sig_len = if rsp_len >= 96 { rsp_len - 96 } else { rsp_len };  // 148 bytes
+        for i in 0..rsp_no_sig_len.min(2048) {
             transcript_data.push(SPDM_CTX.key_exchange_rsp_data[i].load(Ordering::SeqCst));
+        }
+        // Append signature (from KE_rsp data after rsp_no_sig)
+        for i in 0..96.min(128) {
+            if rsp_no_sig_len + i < 2048 {
+                transcript_data.push(SPDM_CTX.key_exchange_rsp_data[rsp_no_sig_len + i].load(Ordering::SeqCst));
+            }
+        }
+        // Append responder HMAC (verify_data) to message_k - ONLY if HANDSHAKE_IN_THE_CLEAR is NOT enabled
+        // HANDSHAKE_IN_THE_CLEAR cap = bit 15 (0x8000) in cap_flags
+        // If enabled, responder does NOT include HMAC in message_k
+        let cap_flags = SPDM_CTX.cap_flags.load(Ordering::SeqCst);
+        let handshake_in_clear = (cap_flags & 0x8000) != 0;
+        let hmac_len = SPDM_CTX.responder_hmac_len.load(Ordering::SeqCst) as usize;
+        if !handshake_in_clear && hmac_len > 0 {
+            for i in 0..hmac_len.min(48) {
+                transcript_data.push(SPDM_CTX.responder_hmac[i].load(Ordering::SeqCst));
+            }
+            debug_print!("  appended responder HMAC: len=%zu (handshake NOT in clear)", hmac_len);
+        } else {
+            debug_print!("  skipped responder HMAC: handshake_in_clear=%d", handshake_in_clear as usize);
         }
         // Append FINISH request header (first 4 bytes)
         transcript_data.push(spdm_version);
         transcript_data.push(SPDM_FINISH);
-        transcript_data.push(0);  // param1
-        transcript_data.push(slot_id);  // param2
+        transcript_data.push(0);
+        transcript_data.push(slot_id);
+        
+        debug_print!("  transcript_data total: msg_a=%zu + cert_hash=%zu + ke_req=%zu + ke_rsp=%zu + hmac=%zu + finish_hdr=4", 
+                     msg_a_len, cert_hash_len, req_len, rsp_no_sig_len + 96, if !handshake_in_clear { hmac_len } else { 0 });
         
         let th_curr = match sha384(&transcript_data) {
             Ok(h) => h,

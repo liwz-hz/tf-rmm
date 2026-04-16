@@ -172,30 +172,33 @@ Fake_host platform: `plat/host/`
 
 ## Debugging Status (2026-04-16)
 
-### Session: KEY_EXCHANGE Responder Error Analysis
+### Session: TH1 Transcript Bug Fix - COMPLETE
 
 **Goal**: 实现 rust-spdm-minimal 完全替换 libspdm C 库
 
-**Completed Fixes**:
+**Status**: ✅ **COMPLETE** - Rust library fully replaces C library
+
+**Critical Bug Fixed**: message_a transcript storage issue
+- **Root Cause**: sender_buf and receiver_buf share the same underlying buffer (0x11402e0)
+- **Problem**: After `recv()` returns, the buffer contains RESPONSE, not REQUEST
+- **Symptom**: `message_a first4=10040000` (VERSION response header) instead of `10840000` (GET_VERSION request header)
+- **Impact**: TH1 transcript hash mismatch → FINISH HMAC verification failure
+- **Fix**: Save request bytes BEFORE calling `recv()` in VERSION, CAPABILITIES, and ALGORITHMS exchanges
+
+**All Completed Fixes**:
 1. ✓ Added `libspdm_challenge` function with proper buffer acquisition
 2. ✓ Fixed KEY_EXCHANGE version byte (use `(spdm_version >> 8)` instead of `as u8`)
 3. ✓ Fixed KEY_EXCHANGE buffer acquisition (`acquire_sender`/`release_sender` pattern)
 4. ✓ Fixed FINISH buffer acquisition
 5. ✓ Fixed responder startup conflict (RMM and tfrmm.py both starting responder)
+6. ✓ **Fixed message_a transcript storage (buffer reuse bug)**
 
-**Current Issue**: KEY_EXCHANGE returns ERROR(0x01) = InvalidRequest
-
-**Verified Correct Fields**:
-- Version: 0x12 (SPDM 1.2)
-- Request code: 0xE4
-- param1: 0x00 (no measurement)
-- param2: 0x00 (slot_id=0)
-- req_session_id: 0x1234
-- session_policy: 0x00
-- random_data: 32 bytes
-- exchange_data: 97 bytes (P-384)
-- opaque_length: 0x0000
-- GET_CAPABILITIES flags: 0x82C2 (CERT+ENCRYPT+MAC+KEY_EX+HANDSHAKE_IN_CLEAR)
+**Verified Working**:
+- `!!! verify_finish_req_hmac - PASS !!!`
+- TDISP Lock successful (tdi_id = 256)
+- TDISP Start successful (status = 0x0)
+- RMM exits with code 0
+- Full SPDM session establishment works
 
 **Responder Check Points** (libspdm_rsp_key_exchange.c):
 - Line 209-213: connection_version >= 1.1 ✓
@@ -206,8 +209,14 @@ Fake_host platform: `plat/host/`
 - Line 343-347: request_size >= 139 ✓ (we send 140)
 - Line 349-356: opaque_length check ✓ (0 bytes)
 
-**Next Steps**:
-1. Debug responder internal state (negotiated capabilities storage)
-2. Implement real DHE key generation (crypto/dhe.rs)
-3. Implement transcript hash (TH1)
-4. Implement signature/HMAC verification
+**Implementation Notes**:
+- DHE key generation: Working (ECDH P-384)
+- Transcript hash TH1: Working (SHA-384)
+- Signature verification: Working (ECDSA P-384)
+- HMAC verification: Working (HKDF-SHA384)
+- HANDSHAKE_IN_THE_CLEAR: Correctly handled (no HMAC in KEY_EXCHANGE_RSP)
+
+**Key Technical Insight**:
+The libspdm buffer acquisition API returns the same buffer pointer for both sender and receiver.
+This is an optimization but causes data corruption if request bytes are stored after recv().
+Solution: Always save request bytes BEFORE calling recv().

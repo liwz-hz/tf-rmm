@@ -10,3 +10,8 @@ out
 *~
 *.patch
 *.swp
+
+# Tool-generated files (never commit)
+.gitnexus/
+gmon.out
+tui.json

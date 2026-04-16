@@ -23,7 +23,7 @@ log = "0.4"
 cbindgen = "0.26"
 
 [features]
-default = ["std"]
+default = ["std", "ffi"]
 std = []
 no_std = []
 ffi = []

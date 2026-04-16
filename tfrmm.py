@@ -4,9 +4,15 @@ TF-RMM Build and Run Script
 
 Usage:
     python tfrmm.py --help
-    python tfrmm.py build [--clean]
+    python tfrmm.py build [--clean] [--spdm-lib=rust|c]
     python tfrmm.py run [--no-spdm]
-    python tfrmm.py all
+    python tfrmm.py all [--spdm-lib=rust|c]
+
+SPDM Library Selection:
+    --spdm-lib=rust  Use rust-spdm-minimal (default)
+    --spdm-lib=c     Use libspdm C library
+    --rust-spdm      Same as --spdm-lib=rust
+    --c-spdm         Same as --spdm-lib=c
 """
 
 import argparse
@@ -22,6 +28,9 @@ PROJECT_ROOT = Path(__file__).parent.resolve()
 BUILD_DIR = PROJECT_ROOT / "build"
 RMM_ELF = BUILD_DIR / "Release" / "rmm.elf"
 RMM_CONFIG = "host_defcfg"
+
+# Default SPDM implementation: rust (our goal is to replace C library)
+DEFAULT_SPDM_LIB = "rust"
 
 SPDM_EMU_PATH = BUILD_DIR / "Release" / "spdm_emu" / "spdm_responder_emu"
 SPDM_TRANSPORT = "PCI_DOE"
@@ -52,20 +61,27 @@ def cmd_submodule_update():
     run_cmd(["git", "submodule", "update", "--init", "--recursive"])
 
 
-def cmd_configure():
+def cmd_configure(spdm_lib="rust"):
     """Configure CMake build."""
     print("\n" + "=" * 60)
     print("[STEP] Configuring CMake...")
     print("=" * 60)
     
     BUILD_DIR.mkdir(parents=True, exist_ok=True)
-    run_cmd(
-        ["cmake", "..", f"-DRMM_CONFIG={RMM_CONFIG}", "-DLOG_LEVEL=40"],
-        cwd=BUILD_DIR
-    )
+    
+    cmake_args = ["cmake", "..", f"-DRMM_CONFIG={RMM_CONFIG}", "-DLOG_LEVEL=40"]
+    
+    if spdm_lib == "rust":
+        cmake_args.append("-DRMM_USE_RUST_SPDM=ON")
+        print("[INFO] Using rust-spdm-minimal for SPDM requester")
+    else:
+        cmake_args.append("-DRMM_USE_RUST_SPDM=OFF")
+        print("[INFO] Using libspdm C library for SPDM requester")
+    
+    run_cmd(cmake_args, cwd=BUILD_DIR)
 
 
-def cmd_build(clean=False):
+def cmd_build(clean=False, spdm_lib="rust"):
     """Build the project."""
     print("\n" + "=" * 60)
     print("[STEP] Building...")
@@ -81,7 +97,7 @@ def cmd_build(clean=False):
     
     # Configure if not already done
     if not (BUILD_DIR / "CMakeCache.txt").exists():
-        cmd_configure()
+        cmd_configure(spdm_lib=spdm_lib)
     
     run_cmd(["cmake", "--build", "."], cwd=BUILD_DIR)
     
@@ -179,10 +195,10 @@ def cmd_run(start_spdm=False):
             run_cmd(["pkill", "-f", "spdm_responder_emu"], check=False)
 
 
-def cmd_all(clean=False):
+def cmd_all(clean=False, spdm_lib="rust"):
     """Run all steps: submodule update, build, and run."""
     cmd_submodule_update()
-    cmd_build(clean=clean)
+    cmd_build(clean=clean, spdm_lib=spdm_lib)
     cmd_run()
 
 
@@ -192,13 +208,18 @@ def main():
         formatter_class=argparse.RawDescriptionHelpFormatter,
         epilog="""
 Examples:
-    python tfrmm.py build          # Build the project
-    python tfrmm.py build --clean  # Clean and rebuild
-    python tfrmm.py run            # Run RMM (uses internal responder)
-    python tfrmm.py run --with-external-spdm  # Run with external responder
-    python tfrmm.py all            # Update, build, and run
-    python tfrmm.py submodule      # Update submodules only
-    python tfrmm.py configure      # Configure CMake only
+    python tfrmm.py build                    # Build with Rust SPDM (default)
+    python tfrmm.py build --spdm-lib=c       # Build with C library
+    python tfrmm.py build --rust-spdm        # Same as --spdm-lib=rust
+    python tfrmm.py build --c-spdm           # Same as --spdm-lib=c
+    python tfrmm.py build --clean            # Clean and rebuild (Rust default)
+    python tfrmm.py build --clean --spdm-lib=c  # Clean rebuild with C library
+    python tfrmm.py run                      # Run RMM (uses internal responder)
+    python tfrmm.py run --with-external-spdm # Run with external responder
+    python tfrmm.py all                      # Update, build (Rust), run
+    python tfrmm.py all --spdm-lib=c         # Update, build (C), run
+    python tfrmm.py submodule                # Update submodules only
+    python tfrmm.py configure                # Configure CMake only
         """
     )
     
@@ -207,6 +228,12 @@ Examples:
     # build command
     build_parser = subparsers.add_parser("build", help="Build the project")
     build_parser.add_argument("--clean", action="store_true", help="Clean build directory first")
+    build_parser.add_argument("--spdm-lib", choices=["rust", "c"], default=DEFAULT_SPDM_LIB,
+                              help=f"SPDM library to use (default: {DEFAULT_SPDM_LIB})")
+    build_parser.add_argument("--rust-spdm", action="store_const", dest="spdm_lib", 
+                              const="rust", help="Use rust-spdm-minimal (same as --spdm-lib=rust)")
+    build_parser.add_argument("--c-spdm", action="store_const", dest="spdm_lib",
+                              const="c", help="Use libspdm C library (same as --spdm-lib=c)")
     
     # run command
     run_parser = subparsers.add_parser("run", help="Run RMM (uses internal responder by default)")
@@ -215,12 +242,24 @@ Examples:
     # all command
     all_parser = subparsers.add_parser("all", help="Update submodules, build, and run")
     all_parser.add_argument("--clean", action="store_true", help="Clean build directory first")
+    all_parser.add_argument("--spdm-lib", choices=["rust", "c"], default=DEFAULT_SPDM_LIB,
+                              help=f"SPDM library to use (default: {DEFAULT_SPDM_LIB})")
+    all_parser.add_argument("--rust-spdm", action="store_const", dest="spdm_lib",
+                              const="rust", help="Use rust-spdm-minimal")
+    all_parser.add_argument("--c-spdm", action="store_const", dest="spdm_lib",
+                              const="c", help="Use libspdm C library")
     
     # submodule command
     subparsers.add_parser("submodule", help="Update git submodules")
     
     # configure command
-    subparsers.add_parser("configure", help="Configure CMake")
+    configure_parser = subparsers.add_parser("configure", help="Configure CMake")
+    configure_parser.add_argument("--spdm-lib", choices=["rust", "c"], default=DEFAULT_SPDM_LIB,
+                                  help=f"SPDM library to use (default: {DEFAULT_SPDM_LIB})")
+    configure_parser.add_argument("--rust-spdm", action="store_const", dest="spdm_lib",
+                                  const="rust", help="Use rust-spdm-minimal")
+    configure_parser.add_argument("--c-spdm", action="store_const", dest="spdm_lib",
+                                  const="c", help="Use libspdm C library")
     
     args = parser.parse_args()
     
@@ -228,16 +267,18 @@ Examples:
         parser.print_help()
         sys.exit(0)
     
+    spdm_lib = getattr(args, 'spdm_lib', DEFAULT_SPDM_LIB)
+    
     if args.command == "build":
-        cmd_build(clean=args.clean)
+        cmd_build(clean=args.clean, spdm_lib=spdm_lib)
     elif args.command == "run":
         cmd_run(start_spdm=args.with_external_spdm)
     elif args.command == "all":
-        cmd_all(clean=args.clean)
+        cmd_all(clean=args.clean, spdm_lib=spdm_lib)
     elif args.command == "submodule":
         cmd_submodule_update()
     elif args.command == "configure":
-        cmd_configure()
+        cmd_configure(spdm_lib=spdm_lib)
 
 
 if __name__ == "__main__":
