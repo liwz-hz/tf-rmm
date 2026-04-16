@@ -169,3 +169,45 @@ Fake_host platform: `plat/host/`
 - `host_build/src/host_spdm_rsp_ifc.c`: SPDM responder interface (TCP + DOE)
 - `host_build/src/host_setup.c`: Process launch and main entry
 - `runtime/rmi/pdev.c`: PDEV creation with SPDM-only flags
+
+## Debugging Status (2026-04-16)
+
+### Session: KEY_EXCHANGE Responder Error Analysis
+
+**Goal**: 实现 rust-spdm-minimal 完全替换 libspdm C 库
+
+**Completed Fixes**:
+1. ✓ Added `libspdm_challenge` function with proper buffer acquisition
+2. ✓ Fixed KEY_EXCHANGE version byte (use `(spdm_version >> 8)` instead of `as u8`)
+3. ✓ Fixed KEY_EXCHANGE buffer acquisition (`acquire_sender`/`release_sender` pattern)
+4. ✓ Fixed FINISH buffer acquisition
+5. ✓ Fixed responder startup conflict (RMM and tfrmm.py both starting responder)
+
+**Current Issue**: KEY_EXCHANGE returns ERROR(0x01) = InvalidRequest
+
+**Verified Correct Fields**:
+- Version: 0x12 (SPDM 1.2)
+- Request code: 0xE4
+- param1: 0x00 (no measurement)
+- param2: 0x00 (slot_id=0)
+- req_session_id: 0x1234
+- session_policy: 0x00
+- random_data: 32 bytes
+- exchange_data: 97 bytes (P-384)
+- opaque_length: 0x0000
+- GET_CAPABILITIES flags: 0x82C2 (CERT+ENCRYPT+MAC+KEY_EX+HANDSHAKE_IN_CLEAR)
+
+**Responder Check Points** (libspdm_rsp_key_exchange.c):
+- Line 209-213: connection_version >= 1.1 ✓
+- Line 216-219: version match ✓
+- Line 239-246: MAC_CAP check ✓ (flags contain 0x80)
+- Line 248-252: connection_state >= NEGOTIATED ✓
+- Line 253-260: other_params OPAQUE_DATA_FORMAT_1 ✓
+- Line 343-347: request_size >= 139 ✓ (we send 140)
+- Line 349-356: opaque_length check ✓ (0 bytes)
+
+**Next Steps**:
+1. Debug responder internal state (negotiated capabilities storage)
+2. Implement real DHE key generation (crypto/dhe.rs)
+3. Implement transcript hash (TH1)
+4. Implement signature/HMAC verification
