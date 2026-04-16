@@ -425,6 +425,9 @@ static int host_pdev_cache_device_object(struct host_pdev *h_pdev,
 {
 	int rc = -1;
 
+	printf("[HOST_DEBUG] pdev_cache_object: obj_id=%u buf_len=%lu cert_chain_len=%lu\n",
+	       dev_obj_id, dev_obj_buf_len, h_pdev->cert_chain_len);
+
 	/*
 	 * During PDEV communicate device object of type certificate or VCA is
 	 * cached
@@ -522,6 +525,14 @@ static int host_dev_cache_dev_req_resp(struct host_pdev *h_pdev,
 	int rc;
 
 	rc = 0;
+
+	printf("[HOST_DEBUG] cache_dev_req_resp: flags=0x%lx REQ_CACHE=%d RSP_CACHE=%d obj_id=%d rsp_offset=%lu rsp_len=%lu\n",
+	       dcomm_exit->flags,
+	       (dcomm_exit->flags & RMI_DEV_COMM_EXIT_FLAGS_REQ_CACHE_BIT) ? 1 : 0,
+	       (dcomm_exit->flags & RMI_DEV_COMM_EXIT_FLAGS_RSP_CACHE_BIT) ? 1 : 0,
+	       dcomm_exit->cache_obj_id,
+	       dcomm_exit->cache_rsp_offset,
+	       dcomm_exit->cache_rsp_len);
 
 	if ((dcomm_exit->flags & RMI_DEV_COMM_EXIT_FLAGS_REQ_CACHE_BIT) != 0U) {
 		rc = host_dev_cache_device_object(h_pdev,
@@ -977,6 +988,7 @@ int host_pdev_probe_and_setup(void)
 	}
 
 	/* Get public key. Verifying cert_chain not done by host but by Realm? */
+	printf("[HOST_DEBUG] BEFORE get_public_key: cert_chain_len=%lu\n", pdev->cert_chain_len);
 	rc = host_get_public_key_from_cert_chain(pdev->cert_chain,
 						 pdev->cert_chain_len,
 						 pdev->public_key,
@@ -985,7 +997,7 @@ int host_pdev_probe_and_setup(void)
 						 &pdev->public_key_metadata_len,
 						 &public_key_algo);
 	if (rc != 0) {
-		ERROR("Get public key failed\n");
+		ERROR("Get public key failed (cert_len=%lu)\n", pdev->cert_chain_len);
 		(void)host_pdev_reclaim((int)pdev->pdev_id);
 		return -1;
 	}

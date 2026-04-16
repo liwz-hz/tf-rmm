@@ -1,7 +1,7 @@
 use alloc::boxed::Box;
 
 pub const MAX_SESSIONS: usize = 4;
-pub const MAX_HASH_SIZE: usize = 64;
+pub const MAX_HASH_SIZE_CTX: usize = 64;
 pub const MAX_SPDM_MSG_SIZE: usize = 4096;
 pub const TRANSCRIPT_A_SIZE: usize = 2048;
 pub const SCRATCH_BUFFER_SIZE: usize = 4096;

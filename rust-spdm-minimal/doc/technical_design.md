@@ -957,7 +957,201 @@ Hash_M = hash(Transcript_M)
 
 ---
 
-## 十一、错误处理
+## 十二、调试经验总结
+
+### 12.1 SPDM GET_VERSION 关键发现
+
+**问题：Responder 返回错误响应（4字节，响应码0x7F）**
+
+**原因：GET_VERSION 请求使用了错误的版本字段**
+
+```
+错误代码：
+  sender_buf[0] = 0x12;  // 版本 1.2 - 错误！
+
+正确代码：
+  sender_buf[0] = 0x10;  // 版本 1.0 - 必须使用！
+```
+
+**SPDM 规范要求：**
+- GET_VERSION 请求必须使用 SPDM version 1.0 (0x10)
+- 即使后续协商使用版本 1.2，GET_VERSION 本身必须用 1.0
+- Responder 拒绝版本不匹配的 GET_VERSION 请求
+
+**症状对比：**
+| 版本字段 | Responder 响应 | 状态 |
+|----------|----------------|------|
+| 0x12 (错误) | 4字节，错误码 0x7F | 失败 |
+| 0x10 (正确) | 8字节，VERSION 响应 | 成功 |
+
+### 12.2 Rust FFI 回调签名匹配
+
+**问题：回调函数类型不匹配导致运行时错误**
+
+**解决方案：**
+```rust
+// 发送回调签名
+type SendFunc = extern "C" fn(
+    libspdm_context_t,  // context
+    usize,              // request_size  
+    *const c_void,      // request
+    u64                 // timeout
+) -> libspdm_return_t;
+
+// 接收回调签名（注意：参数顺序不同于发送）
+type RecvFunc = extern "C" fn(
+    libspdm_context_t,  // context
+    *mut usize,         // response_size (指针!)
+    *mut *mut c_void,   // response (双重指针!)
+    u64                 // timeout
+) -> libspdm_return_t;
+```
+
+**关键点：**
+- receive 的 size 和 response 都是可修改的指针
+- C 代码中 `size_t *response_size` 对应 Rust `*mut usize`
+- C 代码中 `void **response` 对应 Rust `*mut *mut c_void`
+
+### 12.3 Buffer 回调的正确使用
+
+**问题：直接使用栈上的缓冲区导致指针验证失败**
+
+**解决方案：必须通过 acquire_sender_buffer 获取缓冲区**
+
+```rust
+// 错误：使用栈缓冲区
+let buf = [0u8; 4096];
+call_send(context, &buf, 4);  // 指针不在 info->send_recv_buffer 内！
+
+// 正确：通过回调获取
+let sender_buf = call_acquire_sender(context);
+call_send(context, sender_buf, 4);  // 指针正确
+```
+
+**原因：**
+- C 回调 `spdm_send_message` 检查 `request` 指针必须在 `info->send_recv_buffer` 范围内
+- 缓冲区由 host 层分配，有特定的内存布局要求
+- 不使用回调获取的缓冲区会导致 `LIBSPDM_STATUS_SEND_FAIL`
+
+### 12.4 编译配置注意事项
+
+**问题：FFI feature 未启用，无符号导出**
+
+**解决方案：Cargo.toml 添加 feature，cmake 传递参数**
+
+```toml
+# Cargo.toml
+[features]
+ffi = []
+```
+
+```cmake
+# FindRustSpdm.cmake
+COMMAND ${CARGO_EXECUTABLE} build --features ffi --release
+```
+
+**验证符号导出：**
+```bash
+nm librust_spdm_minimal.a | grep " T libspdm"
+# 应显示：libspdm_init_connection, libspdm_set_data, 等
+```
+
+### 12.6 版本协商关键发现
+
+**VERSION 响应格式分析：**
+
+Responder VERSION 响应示例（SPDM 1.0 格式）：
+```
+10 04 00 00 00 04 00 10 00 11 00 12 00 13
+```
+
+解析：
+- Bytes 0-3: header (version=0x10, code=0x04, reserved, param1)
+- Bytes 4-5: reserved (在 SPDM 1.0 中)
+- Bytes 6+: version_number_entry 列表
+
+每个 version_number_entry (2 bytes, little endian):
+- bits 15:12 = major version
+- bits 11:8 = minor version
+- bits 7:4 = update version
+- bits 3:0 = alpha
+
+例如 `00 12` (little endian) = 0x1200 = version 1.2
+
+**版本选择策略：**
+- 应选择 requester 和 responder 的最高共同版本
+- Requester 支持: 由 set_data(LIBSPDM_DATA_SPDM_VERSION) 设置
+- Responder 支持: VERSION 响应中的 version_number_entry 列表
+- 选择两者交集的最高版本
+
+**当前问题：**
+- 我们的代码取第一个 entry（版本 1.0），而非协商最高版本
+- 导致 GET_CAPABILITIES 使用版本 1.0 格式（8 bytes）
+- Responder 期望 SPDM 1.2 格式（22 bytes）导致拒绝
+
+### 12.7 GET_CAPABILITIES 格式差异
+
+**SPDM 版本格式差异：**
+
+| SPDM 版本 | GET_CAPABILITIES 请求大小 | 格式 |
+|-----------|---------------------------|------|
+| 1.0/1.1 | 8 bytes | header(4) + flags(4) |
+| 1.2+ | 22 bytes | header(4) + reserved(4) + ct_exp(1) + res(1) + flags(4) + dts(4) + max_msg(4) |
+
+**CAPABILITIES 响应格式：**
+
+| SPDM 版本 | CAPABILITIES 响应大小 | 格式 |
+|-----------|------------------------|------|
+| 1.0/1.1 | 8-12 bytes | header + flags + optional dts/max_msg |
+| 1.2+ | 20 bytes | header(4) + res(4) + ct_exp(1) + res(1) + flags(4) + dts(4) + max_msg(4) |
+
+**关键偏移：**
+- DataTransferSize: bytes 12-15 (SPDM 1.2 响应)
+- MaxSPDMmsgSize: bytes 16-19 (SPDM 1.2 响应)
+
+## 十三、当前进度与下一步
+
+### 13.1 已完成
+
+1. ✓ Rust 库编译成功（ffi feature 启用）
+2. ✓ tf-rmm 编译并链接 Rust 库
+3. ✓ GET_VERSION 成功（版本 1.0 正确使用）
+4. ✓ Rust 调试打印输出正常
+5. ✓ 回调注册和调用正确
+6. ✓ 文档更新完成
+
+### 13.2 待修复
+
+1. ⏳ VERSION 解析 - 需实现最高共同版本选择
+2. ⏳ GET_CAPABILITIES - 需使用协商版本和正确格式
+3. ⏳ NEGOTIATE_ALGORITHMS - 需实现协议交换
+4. ⏳ GET_DIGESTS/GET_CERTIFICATE - 证书获取
+5. ⏳ KEY_EXCHANGE/FINISH - 会话建立
+
+### 13.3 验证标准
+
+每个接口必须：
+- 与 C 版本 SPDM TX/RX 日志对比
+- 确认 Responder 正常响应（非 ERROR）
+- 确认 PDEV 状态转换正确
+
+**Rust no_std 环境使用 printf：**
+```rust
+extern "C" {
+    fn printf(fmt: *const i8, ...);
+}
+
+macro_rules! debug_print {
+    ($s:expr) => {
+        unsafe { printf(concat!("[RUST] ", $s, "\n\0").as_ptr() as *const i8); }
+    };
+}
+```
+
+**注意：**
+- printf 格式字符串必须以 `\0` 结尾
+- u8 类型传给 printf 需要 cast 为 u32/c_int
+- raw pointer 不能用 `[n]` 索引，必须用 `.add(n)` + deref
 
 ### 11.1 SPDM Error Response
 

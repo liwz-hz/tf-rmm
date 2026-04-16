@@ -10,6 +10,7 @@ pub const P256_PUBLIC_KEY_SIZE: usize = 65;
 pub const P256_PRIVATE_KEY_SIZE: usize = 32;
 pub const P256_SHARED_SECRET_SIZE: usize = 32;
 pub const P384_PUBLIC_KEY_SIZE: usize = 97;
+pub const P384_PUBLIC_KEY_RAW_SIZE: usize = 96;
 pub const P384_PRIVATE_KEY_SIZE: usize = 48;
 pub const P384_SHARED_SECRET_SIZE: usize = 48;
 
@@ -58,6 +59,17 @@ impl EcdhP256KeyPair {
 impl EcdhP384KeyPair {
     pub fn public_key_bytes(&self) -> Vec<u8> {
         self.secret.public_key().to_sec1_bytes().to_vec()
+    }
+    
+    pub fn public_key_raw_bytes(&self) -> [u8; P384_PUBLIC_KEY_RAW_SIZE] {
+        let sec1_bytes = self.secret.public_key().to_sec1_bytes();
+        let full_bytes: &[u8] = &*sec1_bytes;
+        let mut result = [0u8; P384_PUBLIC_KEY_RAW_SIZE];
+        if full_bytes.len() == P384_PUBLIC_KEY_SIZE && full_bytes[0] == 0x04 {
+            result[..48].copy_from_slice(&full_bytes[1..49]);
+            result[48..].copy_from_slice(&full_bytes[49..97]);
+        }
+        result
     }
     
     pub fn shared_secret(&self, peer_public: &[u8]) -> SpdmResult<Vec<u8>> {

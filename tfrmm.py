@@ -139,8 +139,12 @@ def cmd_start_spdm():
         sys.exit(1)
 
 
-def cmd_run(start_spdm=True):
-    """Run RMM."""
+def cmd_run(start_spdm=False):
+    """Run RMM.
+    
+    Note: By default, RMM ELF launches its own internal SPDM responder.
+    Use --with-external-spdm only if you need an external responder process.
+    """
     print("\n" + "=" * 60)
     print("[STEP] Running RMM...")
     print("=" * 60)
@@ -152,7 +156,10 @@ def cmd_run(start_spdm=True):
     
     spdm_process = None
     if start_spdm:
+        print("[INFO] Starting external SPDM responder...")
         spdm_process = cmd_start_spdm()
+    else:
+        print("[INFO] Using internal SPDM responder (embedded in RMM ELF)")
     
     print(f"\n[RUN] {RMM_ELF}")
     print("-" * 60)
@@ -187,8 +194,8 @@ def main():
 Examples:
     python tfrmm.py build          # Build the project
     python tfrmm.py build --clean  # Clean and rebuild
-    python tfrmm.py run            # Run RMM with SPDM responder
-    python tfrmm.py run --no-spdm  # Run RMM without starting SPDM
+    python tfrmm.py run            # Run RMM (uses internal responder)
+    python tfrmm.py run --with-external-spdm  # Run with external responder
     python tfrmm.py all            # Update, build, and run
     python tfrmm.py submodule      # Update submodules only
     python tfrmm.py configure      # Configure CMake only
@@ -202,8 +209,8 @@ Examples:
     build_parser.add_argument("--clean", action="store_true", help="Clean build directory first")
     
     # run command
-    run_parser = subparsers.add_parser("run", help="Run RMM")
-    run_parser.add_argument("--no-spdm", action="store_true", help="Don't start SPDM responder")
+    run_parser = subparsers.add_parser("run", help="Run RMM (uses internal responder by default)")
+    run_parser.add_argument("--with-external-spdm", action="store_true", help="Start external SPDM responder instead of using internal one")
     
     # all command
     all_parser = subparsers.add_parser("all", help="Update submodules, build, and run")
@@ -224,7 +231,7 @@ Examples:
     if args.command == "build":
         cmd_build(clean=args.clean)
     elif args.command == "run":
-        cmd_run(start_spdm=not args.no_spdm)
+        cmd_run(start_spdm=args.with_external_spdm)
     elif args.command == "all":
         cmd_all(clean=args.clean)
     elif args.command == "submodule":

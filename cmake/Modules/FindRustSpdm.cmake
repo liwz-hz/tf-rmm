@@ -23,6 +23,7 @@ endif()
 
 # Set paths
 set(RUST_SPDM_DIR "${RMM_SOURCE_DIR}/rust-spdm-minimal")
+set(RUST_SPDM_BUILD_DIR "${RUST_SPDM_DIR}/target")
 set(RUST_SPDM_STATIC_LIB "${RUST_SPDM_DIR}/target/release/librust_spdm_minimal.a")
 set(RUST_SPDM_HEADER "${RUST_SPDM_DIR}/include/rust_spdm.h")
 

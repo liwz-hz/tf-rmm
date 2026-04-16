@@ -140,6 +140,11 @@ static libspdm_return_t spdm_send_message(void *spdm_context,
 	}
 	info->exit_args.req_len = request_size;
 
+	printf("[C_DEBUG] SEND_YIELD: flags=0x%lx RSP_CACHE=%d REQ_SEND=%d\n",
+	     (unsigned long)info->exit_args.flags,
+	     (info->exit_args.flags & RMI_DEV_COMM_EXIT_FLAGS_RSP_CACHE_BIT) ? 1 : 0,
+	     (info->exit_args.flags & RMI_DEV_COMM_EXIT_FLAGS_REQ_SEND_BIT) ? 1 : 0);
+
 	/* Copy back the exit args to shared buf */
 	copy_back_exit_args_to_shared(info);
 
@@ -542,6 +547,8 @@ static int cma_spdm_cache_certificate(struct dev_assign_info *info,
 		 */
 		cert_chain_offset = sizeof(spdm_cert_chain_t) +
 			libspdm_get_hash_size(spdm_hash_algo);
+		printf("[C_DEBUG] cert_chain_offset: hash_algo=0x%x hash_size=%u cert_chain_offset=%zu\n",
+		       spdm_hash_algo, libspdm_get_hash_size(spdm_hash_algo), cert_chain_offset);
 		cache_offset = sizeof(spdm_certificate_response_t) +
 			cert_chain_offset;
 		if (cert_chain_offset > cert_rsp->portion_length) {
@@ -580,6 +587,8 @@ static int cma_spdm_cache_certificate(struct dev_assign_info *info,
 	 * As certificate is received (in parts or whole) invoke cache callback
 	 * to let NS Host to cache device certificate.
 	 */
+	printf("[C_DEBUG] cma_cache_cert: cache_offset=%zu cache_len=%zu portion=%u remainder=%u\n",
+	       cache_offset, cache_len, cert_rsp->portion_length, cert_rsp->remainder_length);
 	rc = dev_assign_dev_comm_set_cache(info, cert_rsp, cache_offset,
 				  cache_len, CACHE_TYPE_CERT, CACHE_COMM_DIR_RESP, hash_op_flags);
 

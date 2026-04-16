@@ -5,7 +5,7 @@ parse_deps = false
 include = ["SpdmContext", "SpdmStatus", "ConnectionState", "SessionState"]
 
 [fn]
-sort_by = ["Name"]
+sort_by = "Name"
 
 [struct]
 rename_fields = "None"

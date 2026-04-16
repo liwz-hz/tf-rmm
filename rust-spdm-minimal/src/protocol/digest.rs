@@ -2,7 +2,7 @@
 
 use crate::error::{SpdmStatus, SpdmResult};
 use crate::message::{SpdmMessageHeader, SpdmVersion, SpdmRequestCode, SpdmResponseCode, SpdmEncode, SpdmDecode};
-use crate::context::MAX_HASH_SIZE;
+use crate::crypto::MAX_HASH_SIZE;
 use alloc::vec::Vec;
 
 /// GET_DIGESTS Request (4 bytes header only)
