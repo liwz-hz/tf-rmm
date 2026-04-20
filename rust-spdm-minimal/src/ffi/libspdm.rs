@@ -553,6 +553,11 @@ unsafe fn call_transport_encode(
     let mut encoded_size = transport_buffer_capacity;
     let mut encoded_ptr = transport_buffer as *mut c_void;
     
+    let encoded_size_ptr = &mut encoded_size as *mut usize;
+    let encoded_ptr_ptr = &mut encoded_ptr as *mut *mut c_void;
+    
+    debug_print!("  BEFORE: encoded_size=%zu, ptr_addr=%p", encoded_size, encoded_size_ptr);
+    
     let ret = func(
         context,
         session_id,
@@ -560,10 +565,11 @@ unsafe fn call_transport_encode(
         true,
         spdm_message_size,
         spdm_message as *const c_void,
-        &mut encoded_size,
-        &mut encoded_ptr,
+        encoded_size_ptr,
+        encoded_ptr_ptr,
     );
-    debug_print!("  transport_encode ret=%u, encoded_size=%zu, ptr=%p", ret, encoded_size, encoded_ptr);
+    
+    debug_print!("  AFTER: ret=%u, encoded_size=%zu, ptr=%p", ret, encoded_size, encoded_ptr);
     (ret, encoded_ptr as *mut u8, encoded_size)
 }
 
@@ -2598,13 +2604,17 @@ pub extern "C" fn libspdm_stop_session(
 #[no_mangle]
 pub extern "C" fn libspdm_send_receive_data(
     context: libspdm_context_t,
-    session_id: libspdm_session_id_t,
+    session_id: *const libspdm_session_id_t,
+    _is_app_message: bool,
     request: *const u8,
     request_size: usize,
     response: *mut u8,
     response_size: *mut usize,
 ) -> libspdm_return_t {
-    debug_print!("send_receive_data(context=%p, session=0x%x, req_size=%zu)", context, session_id, request_size);
+    // Extract session_id value from pointer (NULL means no session)
+    let session_id_val = if session_id.is_null() { 0 } else { unsafe { *session_id } };
+    debug_print!("send_receive_data(context=%p, session=0x%x, is_app=%u, req_size=%zu)", 
+                 context, session_id_val, _is_app_message as u8, request_size);
     
     if request.is_null() || request_size == 0 {
         debug_print!("  ERROR: null/empty request");
@@ -2615,7 +2625,7 @@ pub extern "C" fn libspdm_send_receive_data(
         return LIBSPDM_STATUS_ERROR;
     }
     
-    let session_id_ptr = if session_id == 0 { core::ptr::null() } else { &session_id as *const u32 };
+    let session_id_ptr = if session_id.is_null() { core::ptr::null() } else { session_id };
     
     unsafe {
         // Step 1: Acquire sender buffer
@@ -2625,20 +2635,31 @@ pub extern "C" fn libspdm_send_receive_data(
             return LIBSPDM_STATUS_ERROR;
         }
         
-        // Step 2: Copy request to sender buffer (skip transport header space)
-        // Transport header size is typically 4 bytes for DOE
+        // Step 2: For secured messages (session_id != NULL), use scratch buffer to avoid overlap
+        // C's libspdm_send_request copies message to scratch buffer before encoding:
+        //   Input: scratch_buffer + transport_header_size
+        //   Output: sender_buffer (secured message written here)
+        // This prevents buffer overlap where input/output would share same location.
         let transport_header_size = 4;
-        let spdm_message = sender_buf.add(transport_header_size);
-        core::ptr::copy_nonoverlapping(request, spdm_message as *mut u8, request_size);
-        
-        // Step 3: Call transport_encode to wrap message (DOE + secured message if session)
         let sender_capacity = 4096;
+        
+        // Allocate scratch buffer on stack (matching C's pattern)
+        // This is the input buffer for transport_encode, separate from sender_buf (output)
+        let mut scratch_buffer: [u8; 4096] = [0; 4096];
+        let spdm_message_in = scratch_buffer.as_mut_ptr().add(transport_header_size);
+        
+        // Copy request to scratch buffer (input location)
+        core::ptr::copy_nonoverlapping(request, spdm_message_in, request_size);
+        
+        // Step 3: Call transport_encode with SEPARATE buffers:
+        //   Input: scratch_buffer + transport_header_size (spdm_message_in)
+        //   Output: sender_buf (transport_msg)
         let (encode_ret, transport_msg, transport_size) = call_transport_encode(
             context,
             session_id_ptr,
-            spdm_message as *const u8,
+            spdm_message_in as *const u8,  // INPUT: scratch buffer (separate from output)
             request_size,
-            sender_buf,
+            sender_buf,                     // OUTPUT: sender buffer
             sender_capacity,
         );
         

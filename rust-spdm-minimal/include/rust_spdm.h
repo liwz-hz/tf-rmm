@@ -286,11 +286,11 @@
 
 #define PCI_TDISP_INTERFACE_STATE_ERROR 3
 
-#define SPDM_VENDOR_DEFINED_REQUEST 131
+#define SPDM_VENDOR_DEFINED_REQUEST 254
 
-#define SPDM_VENDOR_DEFINED_RESPONSE 3
+#define SPDM_VENDOR_DEFINED_RESPONSE 126
 
-#define SPDM_STANDARD_ID_PCISIG 0
+#define SPDM_STANDARD_ID_PCISIG 3
 
 #define SPDM_VENDOR_ID_PCISIG 1
 
@@ -468,7 +468,8 @@ libspdm_return_t libspdm_start_session(libspdm_context_t context,
 libspdm_return_t libspdm_stop_session(libspdm_context_t context, libspdm_session_id_t session_id);
 
 libspdm_return_t libspdm_send_receive_data(libspdm_context_t context,
-                                           libspdm_session_id_t session_id,
+                                           const libspdm_session_id_t *session_id,
+                                           bool _is_app_message,
                                            const uint8_t *request,
                                            uintptr_t request_size,
                                            uint8_t *response,

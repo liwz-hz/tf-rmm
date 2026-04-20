@@ -55,9 +55,9 @@ pub const PCI_TDISP_INTERFACE_STATE_RUN: u8 = 2;
 pub const PCI_TDISP_INTERFACE_STATE_ERROR: u8 = 3;
 
 // SPDM constants
-pub const SPDM_VENDOR_DEFINED_REQUEST: u8 = 0x83;
-pub const SPDM_VENDOR_DEFINED_RESPONSE: u8 = 0x03;
-pub const SPDM_STANDARD_ID_PCISIG: u16 = 0x0000;
+pub const SPDM_VENDOR_DEFINED_REQUEST: u8 = 0xFE;
+pub const SPDM_VENDOR_DEFINED_RESPONSE: u8 = 0x7E;
+pub const SPDM_STANDARD_ID_PCISIG: u16 = 0x0003;
 pub const SPDM_VENDOR_ID_PCISIG: u16 = 0x0001;
 
 pub const PCI_TDISP_START_INTERFACE_NONCE_SIZE: usize = 32;
@@ -236,11 +236,11 @@ fn pci_tdisp_send_receive_vdm(
     
     debug_print!("TDISP VDM: sending type=0x%x size=%zu", tdisp_message_type, vdm_req_size);
     
-    // Call libspdm_send_receive_data
     let mut actual_rsp_size = vdm_rsp_size;
     let status = libspdm_send_receive_data(
         spdm_context,
-        if session_id.is_null() { 0 } else { unsafe { *session_id } },
+        session_id,
+        false,
         vdm_request.as_ptr(),
         vdm_req_size,
         vdm_response.as_mut_ptr(),
