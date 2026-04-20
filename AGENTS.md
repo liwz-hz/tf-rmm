@@ -170,53 +170,49 @@ Fake_host platform: `plat/host/`
 - `host_build/src/host_setup.c`: Process launch and main entry
 - `runtime/rmi/pdev.c`: PDEV creation with SPDM-only flags
 
-## Debugging Status (2026-04-16)
+## Debugging Status (2026-04-20)
 
-### Session: TH1 Transcript Bug Fix - COMPLETE
+### Session: Rust Library Full Replacement - COMPLETE
 
 **Goal**: 实现 rust-spdm-minimal 完全替换 libspdm C 库
 
 **Status**: ✅ **COMPLETE** - Rust library fully replaces C library
 
-**Critical Bug Fixed**: message_a transcript storage issue
-- **Root Cause**: sender_buf and receiver_buf share the same underlying buffer (0x11402e0)
-- **Problem**: After `recv()` returns, the buffer contains RESPONSE, not REQUEST
-- **Symptom**: `message_a first4=10040000` (VERSION response header) instead of `10840000` (GET_VERSION request header)
-- **Impact**: TH1 transcript hash mismatch → FINISH HMAC verification failure
-- **Fix**: Save request bytes BEFORE calling `recv()` in VERSION, CAPABILITIES, and ALGORITHMS exchanges
+### All Completed Fixes
 
-**All Completed Fixes**:
-1. ✓ Added `libspdm_challenge` function with proper buffer acquisition
-2. ✓ Fixed KEY_EXCHANGE version byte (use `(spdm_version >> 8)` instead of `as u8`)
-3. ✓ Fixed KEY_EXCHANGE buffer acquisition (`acquire_sender`/`release_sender` pattern)
-4. ✓ Fixed FINISH buffer acquisition
-5. ✓ Fixed responder startup conflict (RMM and tfrmm.py both starting responder)
-6. ✓ **Fixed message_a transcript storage (buffer reuse bug)**
+1. ✓ Session ID formula fix (commit 6804cd2): `(rsp << 16) | req`
+2. ✓ req_session_id fix (commit 6804cd2): Use 0xFFFF instead of hardcoded 0x1234
+3. ✓ VERSION DOE padding trim (commit 6804cd2): Use actual SPDM size, not DOE padded
+4. ✓ Certificate caching via transport_decode (commit 9008fd1): Call `call_transport_decode` in `get_certificate`
+5. ✓ TH1 transcript storage fix: Save request bytes before `recv()`
+6. ✓ **Transport_encode parameters fix (commit a725a0f)**: Pass correct SPDM message pointer and buffer capacity
 
-**Verified Working**:
-- `!!! verify_finish_req_hmac - PASS !!!`
-- TDISP Lock successful (tdi_id = 256)
-- TDISP Start successful (status = 0x0)
-- RMM exits with code 0
-- Full SPDM session establishment works
+### Latest Fix: Transport Encode Parameters (a725a0f)
 
-**Responder Check Points** (libspdm_rsp_key_exchange.c):
-- Line 209-213: connection_version >= 1.1 ✓
-- Line 216-219: version match ✓
-- Line 239-246: MAC_CAP check ✓ (flags contain 0x80)
-- Line 248-252: connection_state >= NEGOTIATED ✓
-- Line 253-260: other_params OPAQUE_DATA_FORMAT_1 ✓
-- Line 343-347: request_size >= 139 ✓ (we send 140)
-- Line 349-356: opaque_length check ✓ (0 bytes)
+**Problem**: VDEV TDISP communication failed, sending 4096 bytes instead of ~52 bytes
+**Root Cause**: Incorrect parameters to `call_transport_encode`:
+- Passed sender_buf as SPDM message instead of (sender_buf + transport_header_size)
+- Passed incorrect buffer capacity calculation
+**Fix**: 
+- Pass `spdm_message` (located at sender_buf + transport_header_size) to encode callback
+- Pass full sender_buf (4096) for encoding output buffer
+- Rename parameters for clarity: spdm_message, spdm_message_size, transport_buffer
 
-**Implementation Notes**:
-- DHE key generation: Working (ECDH P-384)
-- Transcript hash TH1: Working (SHA-384)
-- Signature verification: Working (ECDSA P-384)
-- HMAC verification: Working (HKDF-SHA384)
-- HANDSHAKE_IN_THE_CLEAR: Correctly handled (no HMAC in KEY_EXCHANGE_RSP)
+### Verified Working
 
-**Key Technical Insight**:
-The libspdm buffer acquisition API returns the same buffer pointer for both sender and receiver.
-This is an optimization but causes data corruption if request bytes are stored after recv().
-Solution: Always save request bytes BEFORE calling recv().
+| Test | Rust Library | C Library |
+|------|-------------|-----------|
+| Stage 1-5 (PDEV, Realm) | ✓ PASS | ✓ PASS |
+| Stage 6 (TDISP Lock/Start) | ✓ PASS | ✓ PASS |
+| Exit Code | 0 | 0 |
+| Secured TDISP VDM size | 52 bytes | 52 bytes |
+
+### Key Technical Insights
+
+1. **Buffer Acquisition**: Same buffer pointer for sender and receiver - save request before recv()
+2. **Transport Encoding**: 
+   - SPDM message located at (buffer + transport_header_size)
+   - transport_encode wraps with DOE header + secured message encryption
+   - Pass SPDM message pointer and full buffer for output
+3. **VDEV/PDEV Session**: Share same session_id from `dev_assign_info`
+4. **Secured Messages**: Transport callbacks handle DOE wrapping and encryption transparently
