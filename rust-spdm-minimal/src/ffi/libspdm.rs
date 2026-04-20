@@ -647,34 +647,42 @@ pub extern "C" fn libspdm_init_connection(context: libspdm_context_t) -> libspdm
         let recv_ret = call_recv(context, &mut recv_ptr, &mut recv_size);
         debug_print!("  recv returned %u, size=%zu", recv_ret, recv_size);
         
-        // Save VERSION request+response to message_a transcript (BEFORE releasing buffers)
-        // message_a = GET_VERSION req (4 bytes) + VERSION rsp (recv_size bytes)
-        // Use saved_request_bytes since sender_buf may now contain response data
+        if recv_ret != LIBSPDM_STATUS_SUCCESS || recv_size < 6 {
+            debug_print!("  ERROR: recv failed or too small");
+            call_release_sender(context, sender_buf as *mut c_void);
+            call_release_receiver(context, receiver_buf as *mut c_void);
+            return LIBSPDM_STATUS_ERROR;
+        }
+        
+        if *receiver_buf.add(1) != 0x04 {
+            debug_print!("  ERROR: wrong response code 0x%02x (expected 0x04)", *receiver_buf.add(1) as u32);
+            call_release_sender(context, sender_buf as *mut c_void);
+            call_release_receiver(context, receiver_buf as *mut c_void);
+            return LIBSPDM_STATUS_ERROR;
+        }
+        
+        // Calculate actual SPDM message size (trim DOE padding)
+        // VERSION response: header(4) + reserved2(2) + version_number_entry[count*2]
+        let version_count = *receiver_buf.add(5) as usize;
+        let actual_rsp_size = 6 + version_count * 2;
+        debug_print!("  VERSION actual SPDM size: %zu (DOE padded=%zu, count=%u)", actual_rsp_size, recv_size, version_count as u32);
+        
+        // Save VERSION request+response to message_a transcript using actual SPDM sizes
         for i in 0..4 {
             if msg_a_len + i < 4096 {
                 SPDM_CTX.message_a_data[msg_a_len + i].store(saved_request_bytes[i], Ordering::SeqCst);
             }
         }
-        for i in 0..recv_size.min(4096 - msg_a_len - 4) {
+        for i in 0..actual_rsp_size.min(4096 - msg_a_len - 4) {
             SPDM_CTX.message_a_data[msg_a_len + 4 + i].store(*receiver_buf.add(i), Ordering::SeqCst);
         }
-        SPDM_CTX.message_a_len.store((msg_a_len + 4 + recv_size) as u32, Ordering::SeqCst);
-        debug_print!("  saved VERSION to message_a: req=4, rsp=%zu, total=%zu", recv_size, msg_a_len + 4 + recv_size);
-
+        SPDM_CTX.message_a_len.store((msg_a_len + 4 + actual_rsp_size) as u32, Ordering::SeqCst);
+        debug_print!("  saved VERSION to message_a: req=4, rsp=%zu, total=%zu", actual_rsp_size, msg_a_len + 4 + actual_rsp_size);
+        
         call_release_sender(context, sender_buf as *mut c_void);
         call_release_receiver(context, receiver_buf as *mut c_void);
-
-        if recv_ret != LIBSPDM_STATUS_SUCCESS || recv_size < 6 {
-            debug_print!("  ERROR: recv failed or too small");
-            return LIBSPDM_STATUS_ERROR;
-        }
-
-        if *receiver_buf.add(1) != 0x04 {
-            debug_print!("  ERROR: wrong response code 0x%02x (expected 0x04)", *receiver_buf.add(1) as u32);
-            return LIBSPDM_STATUS_ERROR;
-        }
-
-        debug_print!("  VERSION response OK: code=0x%02x, count=%u", *receiver_buf.add(1) as u32, *receiver_buf.add(5) as u32);
+        
+        debug_print!("  VERSION response OK: code=0x%02x, count=%u", *receiver_buf.add(1) as u32, version_count as u32);
         
         // Parse VERSION response to get negotiated version
         // VERSION response format: version(1), response_code(1), reserved(1), param1(1), reserved2(2), version_number_entry[]
@@ -1589,8 +1597,8 @@ pub extern "C" fn libspdm_key_exchange(
     
     debug_print!("  dhe_group=0x%x, key_size=%zu (X+Y coordinates, no prefix)", dhe_group, dhe_key_size);
     
-    // Generate req_session_id (random)
-    let req_session_id: u16 = 0x1234; // Simplified - should be random
+    // Generate req_session_id: first session uses 0xFFFF (per C library: 0xFFFF - index)
+    let req_session_id: u16 = 0xFFFF;
     unsafe { SPDM_CTX.req_session_id.store(req_session_id, Ordering::SeqCst); }
     
     // Generate real ECDH P-384 key pair
@@ -1815,8 +1823,8 @@ pub extern "C" fn libspdm_key_exchange(
         
         SPDM_CTX.rsp_session_id.store(rsp_session_id, Ordering::SeqCst);
         
-        // Generate final session_id = (req_session_id << 16) | rsp_session_id
-        let final_session_id = ((req_session_id as u32) << 16) | (rsp_session_id as u32);
+        // Generate final session_id = (rsp_session_id << 16) | req_session_id
+        let final_session_id = ((rsp_session_id as u32) << 16) | (req_session_id as u32);
         SPDM_CTX.session_id.store(final_session_id, Ordering::SeqCst);
         *session_id = final_session_id;
         
