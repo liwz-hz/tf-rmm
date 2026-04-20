@@ -832,10 +832,6 @@ spdm_transport_decode_message(void *spdm_context, uint32_t **session_id,
 	(void)is_app_message;
 	info = spdm_to_dev_assign_info(spdm_context);
 
-	printf("[C-DECODE-ENTRY] transport_size=%zu message_size=%zu ptr=%p\n",
-	       transport_message_size, *message_size, message_size);
-	fflush(stdout);
-
 	/*
 	 * As no transport headers are available, the type of the received
 	 * message is SPDM or SECURED_SPDM based on last sent request type.

@@ -666,7 +666,6 @@ unsafe fn call_transport_decode(
         return LIBSPDM_STATUS_SUCCESS;
     }
     debug_print!("  calling transport_decode callback");
-    debug_print!("  STEP1: before var decl");
     
     // Signature: libspdm_return_t (*)(void*, uint32_t**, bool*, bool, size_t, void*, size_t*, void**)
     let func: extern "C" fn(
@@ -680,14 +679,8 @@ unsafe fn call_transport_decode(
         *mut *mut c_void,
     ) -> libspdm_return_t = core::mem::transmute(func_ptr);
     
-    debug_print!("  STEP2: after func transmute");
-    
     let mut session_id: *mut u32 = core::ptr::null_mut();
     let mut is_app_message: bool = false;
-    
-    debug_print!("  STEP3: before reading message_size");
-    let ms_val = unsafe { *message_size };
-    debug_print!("  STEP4: message_size=%zu", ms_val);
     
     let ret = func(
         context,
@@ -3309,8 +3302,6 @@ pub extern "C" fn libspdm_send_receive_data(
         }
         
         debug_print!("  recv success: raw_size=%zu", recv_size);
-        
-        debug_print!("!!!BEFORE-DECODE!!! decoded_size=4096");
         
         // Step 6: Call transport_decode to unwrap (secured message decode if session)
         let mut decoded_msg: *mut c_void = core::ptr::null_mut();
