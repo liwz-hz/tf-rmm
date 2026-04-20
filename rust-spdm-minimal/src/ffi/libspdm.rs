@@ -525,17 +525,17 @@ unsafe fn call_recv(context: libspdm_context_t, buf: *mut *mut c_void, size: *mu
 unsafe fn call_transport_encode(
     context: libspdm_context_t,
     session_id: *const u32,
-    message: *const u8,
-    message_size: usize,
-    buffer: *mut u8,
-    buffer_capacity: usize,
+    spdm_message: *const u8,
+    spdm_message_size: usize,
+    transport_buffer: *mut u8,
+    transport_buffer_capacity: usize,
 ) -> (libspdm_return_t, *mut u8, usize) {
     let func_ptr = SPDM_CTX.transport_encode.load(Ordering::SeqCst);
-    debug_print!("call_transport_encode(func=%p, session=%p, msg_size=%zu, buf_cap=%zu)", 
-                 func_ptr, session_id, message_size, buffer_capacity);
+    debug_print!("call_transport_encode(func=%p, session=%p, spdm_size=%zu, buf_cap=%zu)", 
+                 func_ptr, session_id, spdm_message_size, transport_buffer_capacity);
     if func_ptr.is_null() {
         debug_print!("  transport_encode is NULL, returning raw message");
-        return (LIBSPDM_STATUS_SUCCESS, message as *mut u8, message_size);
+        return (LIBSPDM_STATUS_SUCCESS, spdm_message as *mut u8, spdm_message_size);
     }
     debug_print!("  calling transport_encode callback");
     
@@ -550,21 +550,21 @@ unsafe fn call_transport_encode(
         *mut *mut c_void,
     ) -> libspdm_return_t = core::mem::transmute(func_ptr);
     
-    let mut msg_buf_size = buffer_capacity;
-    let mut msg_buf_ptr = buffer as *mut c_void;
+    let mut encoded_size = transport_buffer_capacity;
+    let mut encoded_ptr = transport_buffer as *mut c_void;
     
     let ret = func(
         context,
         session_id,
         false,
         true,
-        message_size,
-        message as *const c_void,
-        &mut msg_buf_size,
-        &mut msg_buf_ptr,
+        spdm_message_size,
+        spdm_message as *const c_void,
+        &mut encoded_size,
+        &mut encoded_ptr,
     );
-    debug_print!("  transport_encode ret=%u, encoded_size=%zu", ret, msg_buf_size);
-    (ret, msg_buf_ptr as *mut u8, msg_buf_size)
+    debug_print!("  transport_encode ret=%u, encoded_size=%zu, ptr=%p", ret, encoded_size, encoded_ptr);
+    (ret, encoded_ptr as *mut u8, encoded_size)
 }
 
 unsafe fn call_transport_decode(
@@ -2628,19 +2628,18 @@ pub extern "C" fn libspdm_send_receive_data(
         // Step 2: Copy request to sender buffer (skip transport header space)
         // Transport header size is typically 4 bytes for DOE
         let transport_header_size = 4;
-        let transport_tail_size = 0;
-        let sender_capacity = 4096 - transport_header_size - transport_tail_size;
-        let spdm_request = sender_buf.add(transport_header_size);
-        core::ptr::copy_nonoverlapping(request, spdm_request as *mut u8, request_size);
+        let spdm_message = sender_buf.add(transport_header_size);
+        core::ptr::copy_nonoverlapping(request, spdm_message as *mut u8, request_size);
         
         // Step 3: Call transport_encode to wrap message (DOE + secured message if session)
+        let sender_capacity = 4096;
         let (encode_ret, transport_msg, transport_size) = call_transport_encode(
             context,
             session_id_ptr,
-            spdm_request as *const u8,
+            spdm_message as *const u8,
             request_size,
             sender_buf,
-            sender_capacity + transport_header_size + transport_tail_size,
+            sender_capacity,
         );
         
         if encode_ret != LIBSPDM_STATUS_SUCCESS {
