@@ -266,6 +266,8 @@ pub extern "C" fn libspdm_register_transport_layer_func(
         SPDM_CTX.transport_encode.store(transport_encode, Ordering::SeqCst);
         SPDM_CTX.transport_decode.store(transport_decode, Ordering::SeqCst);
         SPDM_CTX.cap_max_msg_size.store(max_msg_size, Ordering::SeqCst);
+        let stored_decode = SPDM_CTX.transport_decode.load(Ordering::SeqCst);
+        debug_print!("  stored transport_decode=%p (verified)", stored_decode);
     }
 }
 
@@ -528,13 +530,14 @@ unsafe fn call_transport_decode(
     message: *mut *mut c_void,
 ) -> libspdm_return_t {
     let func_ptr = SPDM_CTX.transport_decode.load(Ordering::SeqCst);
+    debug_print!("call_transport_decode(func_ptr=%p, size=%u)", func_ptr, transport_size as u32);
     if func_ptr.is_null() {
         debug_print!("  transport_decode is NULL, returning raw message");
         *message_size = transport_size;
         *message = transport_msg;
         return LIBSPDM_STATUS_SUCCESS;
     }
-    debug_print!("call_transport_decode(func=%p, size=%zu)", func_ptr, transport_size);
+    debug_print!("  calling transport_decode callback");
     
     // Signature: libspdm_return_t (*)(void*, uint32_t**, bool*, bool, size_t, void*, size_t*, void**)
     let func: extern "C" fn(
@@ -1266,8 +1269,10 @@ pub extern "C" fn libspdm_get_certificate(
         
         // Loop to get all certificate chunks
         debug_print!("  Certificate retrieval loop START: max_cert_size=%zu", max_cert_size);
+        debug_print!("  DEBUG: cert_chain param=%p, cert_chain_size param=%p", cert_chain, cert_chain_size);
         while remainder > 0 && total_offset < max_cert_size {
             chunk_num += 1;
+            debug_print!("  DEBUG: loop iteration %u start", chunk_num);
             let sender_buf = call_acquire_sender(context);
             if sender_buf.is_null() {
                 debug_print!("  ERROR: failed to acquire sender buffer for GET_CERTIFICATE");
@@ -1325,6 +1330,7 @@ pub extern "C" fn libspdm_get_certificate(
             }
             
             // Call transport_decode to trigger caching callbacks
+            debug_print!("  BEFORE call_transport_decode for CERTIFICATE chunk %u", chunk_num);
             let mut msg_size: usize = 0;
             let mut msg_ptr: *mut c_void = core::ptr::null_mut();
             let decode_ret = call_transport_decode(
@@ -1334,6 +1340,7 @@ pub extern "C" fn libspdm_get_certificate(
                 &mut msg_size,
                 &mut msg_ptr,
             );
+            debug_print!("  AFTER call_transport_decode: ret=%u", decode_ret);
             
             if decode_ret != LIBSPDM_STATUS_SUCCESS {
                 debug_print!("  ERROR: transport_decode failed");
