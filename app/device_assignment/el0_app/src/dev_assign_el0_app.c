@@ -469,11 +469,21 @@ spdm_transport_encode_message(void *spdm_context, const uint32_t *session_id,
 	/* convert message to secured message */
 	sec_msg = (uint8_t *)*transport_message;
 	sec_msg_size = *transport_message_size;
+	
+	/* FORCE PRINT - bypass VERBOSE */
+	printf("[C-ENCODE-BEFORE] transport_message_size=%zu ptr=%p sec_msg=%p\n",
+		*transport_message_size, (void*)transport_message_size, (void*)sec_msg);
+	fflush(stdout);
+	
 	status = libspdm_encode_secured_message(sec_msg_ctx, *session_id,
 						is_request_message,
 						message_size, message,
 						&sec_msg_size, sec_msg,
 						&cma_spdm_sec_msg_cbs);
+	
+	printf("[C-ENCODE-AFTER] status=%u sec_msg_size=%zu\n", status, sec_msg_size);
+	fflush(stdout);
+	
 	if (status != LIBSPDM_STATUS_SUCCESS) {
 		ERROR("cma_spdm: encode_secured_message failed\n");
 		return status;
@@ -483,6 +493,9 @@ spdm_transport_encode_message(void *spdm_context, const uint32_t *session_id,
 
 	/* No transport header are used */
 	*transport_message_size = sec_msg_size;
+	printf("[C-ENCODE-FINAL] *transport_message_size=%zu ptr=%p\n", 
+		*transport_message_size, (void*)transport_message_size);
+	fflush(stdout);
 	*transport_message = (void *)sec_msg;
 
 	return LIBSPDM_STATUS_SUCCESS;

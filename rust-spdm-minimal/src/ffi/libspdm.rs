@@ -1,15 +1,20 @@
 use core::ffi::c_void;
-use core::sync::atomic::{AtomicPtr, AtomicU32, AtomicU16, AtomicU8, Ordering};
+use core::sync::atomic::{AtomicPtr, AtomicU32, AtomicU16, AtomicU8, AtomicU64, Ordering};
 
-use crate::crypto::{ecdh_p384_keypair, EcdhP384KeyPair, P384_PUBLIC_KEY_RAW_SIZE, random_bytes, sha384, hkdf_extract_sha384, hkdf_expand_sha384, hmac_sha384};
+use crate::crypto::{ecdh_p384_keypair, EcdhP384KeyPair, P384_PUBLIC_KEY_RAW_SIZE, random_bytes, sha384, hkdf_extract_sha384, hkdf_expand_sha384, hmac_sha384, aes256_gcm_encrypt, aes256_gcm_decrypt};
 use alloc::vec::Vec;
 
 extern "C" {
     fn printf(fmt: *const i8, ...);
+    fn fflush(stream: *mut core::ffi::c_void) -> i32;
 }
 
 pub const LIBSPDM_STATUS_SUCCESS: u32 = 0;
 pub const LIBSPDM_STATUS_ERROR: u32 = 1;
+pub const LIBSPDM_STATUS_BUFFER_TOO_SMALL: u32 = 0x80000007;
+pub const LIBSPDM_STATUS_CRYPTO_ERROR: u32 = 0x80000003;
+pub const LIBSPDM_STATUS_INVALID_MSG_FIELD: u32 = 0x80000004;
+pub const LIBSPDM_STATUS_UNSUPPORTED_CAP: u32 = 0x80000002;
 
 // SPDM request/response codes
 pub const SPDM_KEY_EXCHANGE: u8 = 0xE4;
@@ -108,8 +113,16 @@ struct SpdmContext {
     request_finished_key: [AtomicU8; 48],
     response_handshake_secret: [AtomicU8; 48],
     response_finished_key: [AtomicU8; 48],
-    responder_hmac: [AtomicU8; 48],  // responder's verify_data for TH_curr
-    responder_hmac_len: AtomicU32,  // 0 = no HMAC, 48 = HMAC included
+    responder_hmac: [AtomicU8; 48],
+    responder_hmac_len: AtomicU32,
+    // Handshake encryption keys (derived from handshake_secret)
+    request_handshake_encryption_key: [AtomicU8; 32],
+    request_handshake_salt: [AtomicU8; 12],
+    request_handshake_sequence_number: AtomicU64,
+    response_handshake_encryption_key: [AtomicU8; 32],
+    response_handshake_salt: [AtomicU8; 12],
+    response_handshake_sequence_number: AtomicU64,
+    session_state: AtomicU32,
     // message_a transcript storage (VERSION + CAPABILITIES + ALGORITHMS)
     message_a_data: [AtomicU8; 4096],
     message_a_len: AtomicU32,
@@ -183,6 +196,13 @@ static mut SPDM_CTX: SpdmContext = SpdmContext {
     response_finished_key: [const { AtomicU8::new(0) }; 48],
     responder_hmac: [const { AtomicU8::new(0) }; 48],
     responder_hmac_len: AtomicU32::new(0),
+    request_handshake_encryption_key: [const { AtomicU8::new(0) }; 32],
+    request_handshake_salt: [const { AtomicU8::new(0) }; 12],
+    request_handshake_sequence_number: AtomicU64::new(0),
+    response_handshake_encryption_key: [const { AtomicU8::new(0) }; 32],
+    response_handshake_salt: [const { AtomicU8::new(0) }; 12],
+    response_handshake_sequence_number: AtomicU64::new(0),
+    session_state: AtomicU32::new(0),
     message_a_data: [const { AtomicU8::new(0) }; 4096],
     message_a_len: AtomicU32::new(0),
 };
@@ -558,6 +578,15 @@ unsafe fn call_transport_encode(
     
     debug_print!("  BEFORE: encoded_size=%zu, ptr_addr=%p", encoded_size, encoded_size_ptr);
     
+    // Force print for secured messages (TDISP)
+    if !session_id.is_null() {
+        unsafe {
+            printf(b"[RUST-PRE-CALL] encoded_size=%zu ptr=%p buf=%p\n\0".as_ptr() as *const i8, 
+                   encoded_size, encoded_size_ptr as *const core::ffi::c_void, encoded_ptr as *const core::ffi::c_void);
+            fflush(0 as *mut core::ffi::c_void);
+        }
+    }
+    
     let ret = func(
         context,
         session_id,
@@ -568,6 +597,15 @@ unsafe fn call_transport_encode(
         encoded_size_ptr,
         encoded_ptr_ptr,
     );
+    
+    // Force print for secured messages (TDISP)
+    if !session_id.is_null() {
+        unsafe {
+            printf(b"[RUST-POST-CALL] ret=%u encoded_size=%zu ptr=%p\n\0".as_ptr() as *const i8, 
+                   ret, encoded_size, encoded_ptr as *const core::ffi::c_void);
+            fflush(0 as *mut core::ffi::c_void);
+        }
+    }
     
     debug_print!("  AFTER: ret=%u, encoded_size=%zu, ptr=%p", ret, encoded_size, encoded_ptr);
     (ret, encoded_ptr as *mut u8, encoded_size)
@@ -2094,6 +2132,42 @@ match keypair.shared_secret(&responder_sec1_pubkey) {
                                             }
                                             debug_print!("  stored request_finished_key");
                                             
+                                            // Derive request_handshake_encryption_key
+                                            // bin_str_enc = length(32) + "spdm1.x enc key"
+                                            let bin_str_enc: Vec<u8> = [
+                                                32, 0,
+                                                b's', b'p', b'd', b'm',
+                                                b'0' + major, b'.', b'0' + minor, b' ',
+                                                b'k', b'e', b'y',
+                                            ].to_vec();
+                                            match hkdf_expand_sha384(&req_hs_secret, &bin_str_enc, 32) {
+                                                Ok(enc_key) => {
+                                                    for i in 0..32 {
+                                                        SPDM_CTX.request_handshake_encryption_key[i].store(enc_key[i], Ordering::SeqCst);
+                                                    }
+                                                    debug_print!("  stored request_handshake_encryption_key");
+                                                }
+                                                Err(_) => debug_print!("  ERROR: enc_key derivation failed"),
+                                            }
+                                            
+                                            // Derive request_handshake_salt
+                                            // bin_str_salt = length(12) + "spdm1.x salt"
+                                            let bin_str_salt: Vec<u8> = [
+                                                12, 0,
+                                                b's', b'p', b'd', b'm',
+                                                b'0' + major, b'.', b'0' + minor, b' ',
+                                                b'i', b'v',
+                                            ].to_vec();
+                                            match hkdf_expand_sha384(&req_hs_secret, &bin_str_salt, 12) {
+                                                Ok(salt) => {
+                                                    for i in 0..12 {
+                                                        SPDM_CTX.request_handshake_salt[i].store(salt[i], Ordering::SeqCst);
+                                                    }
+                                                    debug_print!("  stored request_handshake_salt");
+                                                }
+                                                Err(_) => debug_print!("  ERROR: salt derivation failed"),
+                                            }
+                                            
                                             // Derive response_handshake_secret
                                             // bin_str2 = length(48) + "spdm1.2 rsp hs data" + TH1
                                             let bin_str2: Vec<u8> = [
@@ -2119,6 +2193,40 @@ match keypair.shared_secret(&responder_sec1_pubkey) {
                                                                 SPDM_CTX.response_finished_key[i].store(rsp_finished_key[i], Ordering::SeqCst);
                                                             }
                                                             debug_print!("  stored response_finished_key");
+                                                            
+                                                            // Derive response_handshake_encryption_key
+                                                            let bin_str_rsp_enc: Vec<u8> = [
+                                                                32, 0,
+                                                                b's', b'p', b'd', b'm',
+                                                                b'0' + major, b'.', b'0' + minor, b' ',
+                                                                b'k', b'e', b'y',
+                                                            ].to_vec();
+                                                            match hkdf_expand_sha384(&rsp_hs_secret, &bin_str_rsp_enc, 32) {
+                                                                Ok(enc_key) => {
+                                                                    for i in 0..32 {
+                                                                        SPDM_CTX.response_handshake_encryption_key[i].store(enc_key[i], Ordering::SeqCst);
+                                                                    }
+                                                                    debug_print!("  stored response_handshake_encryption_key");
+                                                                }
+                                                                Err(_) => debug_print!("  ERROR: rsp enc_key derivation failed"),
+                                                            }
+                                                            
+                                                            // Derive response_handshake_salt
+                                                            let bin_str_rsp_salt: Vec<u8> = [
+                                                                12, 0,
+                                                                b's', b'p', b'd', b'm',
+                                                                b'0' + major, b'.', b'0' + minor, b' ',
+                                                                b'i', b'v',
+                                                            ].to_vec();
+                                                            match hkdf_expand_sha384(&rsp_hs_secret, &bin_str_rsp_salt, 12) {
+                                                                Ok(salt) => {
+                                                                    for i in 0..12 {
+                                                                        SPDM_CTX.response_handshake_salt[i].store(salt[i], Ordering::SeqCst);
+                                                                    }
+                                                                    debug_print!("  stored response_handshake_salt");
+                                                                }
+                                                                Err(_) => debug_print!("  ERROR: rsp salt derivation failed"),
+                                                            }
                                                             
                                                             // Calculate responder HMAC (verify_data)
                                                             // TH1_hash = SHA384(TH1_transcript)
@@ -2465,13 +2573,103 @@ pub extern "C" fn libspdm_get_secured_message_context_via_session_id(
 pub extern "C" fn libspdm_encode_secured_message(
     _secured_message_context: *mut c_void,
     session_id: libspdm_session_id_t,
-    _is_request_message: bool,
-    _message_size: usize,
-    _message: *const u8,
-    _secured_message_size: *mut usize,
-    _secured_message: *mut u8,
+    is_request_message: bool,
+    message_size: usize,
+    message: *const u8,
+    secured_message_size: *mut usize,
+    secured_message: *mut u8,
 ) -> libspdm_return_t {
-    debug_print!("encode_secured_msg(session=0x%x)", session_id);
+    debug_print!("encode_secured_msg(session=0x%x, req=%u, msg_size=%zu)", session_id, is_request_message as u32, message_size);
+    
+    if message.is_null() || secured_message.is_null() || secured_message_size.is_null() {
+        return LIBSPDM_STATUS_ERROR;
+    }
+    
+    let buffer_capacity = unsafe { *secured_message_size };
+    let aead_tag_size = 16;
+    let header_size = 6;
+    let required_size = header_size + message_size + aead_tag_size;
+    
+    if buffer_capacity < required_size {
+        debug_print!("  ERROR: buffer too small (cap=%zu, need=%zu)", buffer_capacity, required_size);
+        return LIBSPDM_STATUS_BUFFER_TOO_SMALL;
+    }
+    
+    unsafe {
+        let (enc_key, salt, seq_num) = if is_request_message {
+            let mut key = [0u8; 32];
+            for i in 0..32 {
+                key[i] = SPDM_CTX.request_handshake_encryption_key[i].load(Ordering::SeqCst);
+            }
+            let mut slt = [0u8; 12];
+            for i in 0..12 {
+                slt[i] = SPDM_CTX.request_handshake_salt[i].load(Ordering::SeqCst);
+            }
+            let seq = SPDM_CTX.request_handshake_sequence_number.load(Ordering::SeqCst);
+            (key, slt, seq)
+        } else {
+            let mut key = [0u8; 32];
+            for i in 0..32 {
+                key[i] = SPDM_CTX.response_handshake_encryption_key[i].load(Ordering::SeqCst);
+            }
+            let mut slt = [0u8; 12];
+            for i in 0..12 {
+                slt[i] = SPDM_CTX.response_handshake_salt[i].load(Ordering::SeqCst);
+            }
+            let seq = SPDM_CTX.response_handshake_sequence_number.load(Ordering::SeqCst);
+            (key, slt, seq)
+        };
+        
+        debug_print!("  seq_num=%llu", seq_num);
+        
+        if is_request_message {
+            SPDM_CTX.request_handshake_sequence_number.store(seq_num + 1, Ordering::SeqCst);
+        } else {
+            SPDM_CTX.response_handshake_sequence_number.store(seq_num + 1, Ordering::SeqCst);
+        }
+        
+        let mut iv = salt;
+        let seq_bytes = seq_num.to_le_bytes();
+        for i in 0..8 {
+            iv[i] ^= seq_bytes[i];
+        }
+        
+        let seq_header = (seq_num as u16).to_le_bytes();
+        let aad: Vec<u8> = [
+            (session_id & 0xFF) as u8,
+            ((session_id >> 8) & 0xFF) as u8,
+            ((session_id >> 16) & 0xFF) as u8,
+            ((session_id >> 24) & 0xFF) as u8,
+            seq_header[0], seq_header[1],
+        ].to_vec();
+        
+        let plaintext = core::slice::from_raw_parts(message, message_size);
+        
+        let ciphertext = match aes256_gcm_encrypt(&enc_key, &iv, &aad, plaintext) {
+            Ok(ct) => ct,
+            Err(_) => {
+                debug_print!("  ERROR: AES-GCM encryption failed");
+                return LIBSPDM_STATUS_CRYPTO_ERROR;
+            }
+        };
+        
+        debug_print!("  ciphertext len=%zu (plaintext=%zu + tag=%zu)", ciphertext.len(), message_size, aead_tag_size);
+        
+        let output = core::slice::from_raw_parts_mut(secured_message, required_size);
+        
+        output[0] = (session_id & 0xFF) as u8;
+        output[1] = ((session_id >> 8) & 0xFF) as u8;
+        output[2] = ((session_id >> 16) & 0xFF) as u8;
+        output[3] = ((session_id >> 24) & 0xFF) as u8;
+        output[4] = seq_header[0];
+        output[5] = seq_header[1];
+        output[header_size..required_size].copy_from_slice(&ciphertext);
+        
+        *secured_message_size = required_size;
+        
+        debug_print!("  SUCCESS: secured_message_size=%zu", *secured_message_size);
+    }
+    
     LIBSPDM_STATUS_SUCCESS
 }
 
@@ -2479,13 +2677,100 @@ pub extern "C" fn libspdm_encode_secured_message(
 pub extern "C" fn libspdm_decode_secured_message(
     _secured_message_context: *mut c_void,
     session_id: libspdm_session_id_t,
-    _is_request_message: bool,
-    _secured_message_size: usize,
-    _secured_message: *const u8,
-    _message_size: *mut usize,
-    _message: *mut u8,
+    is_request_message: bool,
+    secured_message_size: usize,
+    secured_message: *const u8,
+    message_size: *mut usize,
+    message: *mut u8,
 ) -> libspdm_return_t {
-    debug_print!("decode_secured_msg(session=0x%x)", session_id);
+    debug_print!("decode_secured_msg(session=0x%x, req=%u, secured_size=%zu)", session_id, is_request_message as u32, secured_message_size);
+    
+    if secured_message.is_null() || message.is_null() || message_size.is_null() {
+        return LIBSPDM_STATUS_ERROR;
+    }
+    
+    let header_size = 6;
+    let aead_tag_size = 16;
+    
+    if secured_message_size < header_size + aead_tag_size {
+        debug_print!("  ERROR: secured message too small");
+        return LIBSPDM_STATUS_INVALID_MSG_FIELD;
+    }
+    
+    unsafe {
+        let secured = core::slice::from_raw_parts(secured_message, secured_message_size);
+        
+        let msg_session_id = u32::from_le_bytes([secured[0], secured[1], secured[2], secured[3]]);
+        if msg_session_id != session_id {
+            debug_print!("  ERROR: session_id mismatch (msg=0x%x, expected=0x%x)", msg_session_id, session_id);
+            return LIBSPDM_STATUS_INVALID_MSG_FIELD;
+        }
+        
+        let seq_num = u16::from_le_bytes([secured[4], secured[5]]) as u64;
+        
+        let plaintext_size = secured_message_size - header_size - aead_tag_size;
+        let buffer_capacity = *message_size;
+        
+        if buffer_capacity < plaintext_size {
+            debug_print!("  ERROR: buffer too small (cap=%zu, need=%zu)", buffer_capacity, plaintext_size);
+            return LIBSPDM_STATUS_BUFFER_TOO_SMALL;
+        }
+        
+        let (enc_key, salt) = if is_request_message {
+            let mut key = [0u8; 32];
+            for i in 0..32 {
+                key[i] = SPDM_CTX.request_handshake_encryption_key[i].load(Ordering::SeqCst);
+            }
+            let mut slt = [0u8; 12];
+            for i in 0..12 {
+                slt[i] = SPDM_CTX.request_handshake_salt[i].load(Ordering::SeqCst);
+            }
+            (key, slt)
+        } else {
+            let mut key = [0u8; 32];
+            for i in 0..32 {
+                key[i] = SPDM_CTX.response_handshake_encryption_key[i].load(Ordering::SeqCst);
+            }
+            let mut slt = [0u8; 12];
+            for i in 0..12 {
+                slt[i] = SPDM_CTX.response_handshake_salt[i].load(Ordering::SeqCst);
+            }
+            (key, slt)
+        };
+        
+        let mut iv = salt;
+        let seq_bytes = seq_num.to_le_bytes();
+        for i in 0..8 {
+            iv[i] ^= seq_bytes[i];
+        }
+        
+        let seq_header = (seq_num as u16).to_le_bytes();
+        let aad: Vec<u8> = [
+            (session_id & 0xFF) as u8,
+            ((session_id >> 8) & 0xFF) as u8,
+            ((session_id >> 16) & 0xFF) as u8,
+            ((session_id >> 24) & 0xFF) as u8,
+            seq_header[0], seq_header[1],
+        ].to_vec();
+        
+        let ciphertext = &secured[header_size..secured_message_size];
+        
+        let plaintext = match aes256_gcm_decrypt(&enc_key, &iv, &aad, ciphertext) {
+            Ok(pt) => pt,
+            Err(_) => {
+                debug_print!("  ERROR: AES-GCM decryption failed");
+                return LIBSPDM_STATUS_CRYPTO_ERROR;
+            }
+        };
+        
+        let output = core::slice::from_raw_parts_mut(message, plaintext_size);
+        output.copy_from_slice(&plaintext);
+        
+        *message_size = plaintext.len();
+        
+        debug_print!("  SUCCESS: plaintext_size=%zu", *message_size);
+    }
+    
     LIBSPDM_STATUS_SUCCESS
 }
 
@@ -2613,6 +2898,15 @@ pub extern "C" fn libspdm_send_receive_data(
 ) -> libspdm_return_t {
     // Extract session_id value from pointer (NULL means no session)
     let session_id_val = if session_id.is_null() { 0 } else { unsafe { *session_id } };
+    
+    // Force print for secured messages (TDISP stage)
+    if !session_id.is_null() {
+        unsafe {
+            printf(b"[RUST-SEND] send_receive_data session=0x%x size=%zu\n\0".as_ptr() as *const i8, session_id_val, request_size);
+            fflush(0 as *mut core::ffi::c_void);
+        }
+    }
+    
     debug_print!("send_receive_data(context=%p, session=0x%x, is_app=%u, req_size=%zu)", 
                  context, session_id_val, _is_app_message as u8, request_size);
     
@@ -2662,6 +2956,14 @@ pub extern "C" fn libspdm_send_receive_data(
             sender_buf,                     // OUTPUT: sender buffer
             sender_capacity,
         );
+        
+        // Force print for secured messages
+        if !session_id_ptr.is_null() {
+            unsafe {
+                printf(b"[RUST-ENCODE] ret=%u size=%zu\n\0".as_ptr() as *const i8, encode_ret, transport_size);
+                fflush(0 as *mut core::ffi::c_void);
+            }
+        }
         
         if encode_ret != LIBSPDM_STATUS_SUCCESS {
             debug_print!("  transport_encode failed: ret=%u", encode_ret);

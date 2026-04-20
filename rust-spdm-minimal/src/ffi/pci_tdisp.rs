@@ -234,7 +234,14 @@ fn pci_tdisp_send_receive_vdm(
         );
     }
     
-    debug_print!("TDISP VDM: sending type=0x%x size=%zu", tdisp_message_type, vdm_req_size);
+    extern "C" {
+        fn printf(fmt: *const i8, ...);
+        fn fflush(stream: *mut core::ffi::c_void) -> i32;
+    }
+    unsafe { 
+        printf(b"[RUST-TDISP] pci_tdisp_send_receive_vdm type=0x%x req_size=%zu\n\0".as_ptr() as *const i8, tdisp_message_type as u32, vdm_req_size);
+        fflush(0 as *mut core::ffi::c_void);
+    }
     
     let mut actual_rsp_size = vdm_rsp_size;
     let status = libspdm_send_receive_data(
@@ -322,7 +329,14 @@ pub extern "C" fn pci_tdisp_get_version(
     session_id: *const u32,
     interface_id: *const c_void,
 ) -> libspdm_return_t {
-    debug_print!("pci_tdisp_get_version");
+    extern "C" {
+        fn printf(fmt: *const i8, ...);
+        fn fflush(stream: *mut core::ffi::c_void) -> i32;
+    }
+    unsafe {
+        printf(b"[RUST-TDISP] pci_tdisp_get_version ENTRY\n\0".as_ptr() as *const i8);
+        fflush(0 as *mut core::ffi::c_void);
+    }
     
     if spdm_context.is_null() {
         return LIBSPDM_STATUS_ERROR;
