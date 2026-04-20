@@ -186,17 +186,17 @@ Fake_host platform: `plat/host/`
 4. ✓ Certificate caching via transport_decode (commit 9008fd1): Call `call_transport_decode` in `get_certificate`
 5. ✓ TH1 transcript storage fix: Save request bytes before `recv()`
 6. ✓ **Transport_encode parameters fix (commit a725a0f)**: Pass correct SPDM message pointer and buffer capacity
+7. ✓ **TDISP stub functions implementation (commit a366a9c)**: Full TDISP protocol compliance
 
-### Latest Fix: Transport Encode Parameters (a725a0f)
+### Latest Fix: TDISP Stub Functions Implementation (a366a9c)
 
-**Problem**: VDEV TDISP communication failed, sending 4096 bytes instead of ~52 bytes
-**Root Cause**: Incorrect parameters to `call_transport_encode`:
-- Passed sender_buf as SPDM message instead of (sender_buf + transport_header_size)
-- Passed incorrect buffer capacity calculation
+**Problem**: 3 TDISP functions were stubs returning SUCCESS without sending messages
+**Root Cause**: `pci_tdisp_get_version`, `pci_tdisp_get_capabilities`, `pci_tdisp_lock_interface` were placeholder stubs
 **Fix**: 
-- Pass `spdm_message` (located at sender_buf + transport_header_size) to encode callback
-- Pass full sender_buf (4096) for encoding output buffer
-- Rename parameters for clarity: spdm_message, spdm_message_size, transport_buffer
+- Add proper request/response structures for VERSION, CAPABILITIES, LOCK_INTERFACE
+- Implement each function to send actual TDISP VDM via `pci_tdisp_send_receive_vdm()`
+- Validate responses and extract data (version number, capabilities, nonce)
+- Use pointer arithmetic for packed struct field access
 
 ### Verified Working
 
