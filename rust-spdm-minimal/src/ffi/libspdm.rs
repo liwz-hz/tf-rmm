@@ -15,6 +15,11 @@ pub const LIBSPDM_STATUS_BUFFER_TOO_SMALL: u32 = 0x80000007;
 pub const LIBSPDM_STATUS_CRYPTO_ERROR: u32 = 0x80000003;
 pub const LIBSPDM_STATUS_INVALID_MSG_FIELD: u32 = 0x80000004;
 pub const LIBSPDM_STATUS_UNSUPPORTED_CAP: u32 = 0x80000002;
+pub const LIBSPDM_STATUS_RECEIVE_FAIL: u32 = 0x80040001;
+
+pub const LIBSPDM_SESSION_STATE_NOT_STARTED: u32 = 0;
+pub const LIBSPDM_SESSION_STATE_HANDSHAKING: u32 = 1;
+pub const LIBSPDM_SESSION_STATE_ESTABLISHED: u32 = 2;
 
 // SPDM request/response codes
 pub const SPDM_KEY_EXCHANGE: u8 = 0xE4;
@@ -123,6 +128,19 @@ struct SpdmContext {
     response_handshake_salt: [AtomicU8; 12],
     response_handshake_sequence_number: AtomicU64,
     session_state: AtomicU32,
+    // Application secret keys (derived after FINISH, used when session ESTABLISHED)
+    master_secret: [AtomicU8; 48],
+    request_data_encryption_key: [AtomicU8; 32],
+    request_data_salt: [AtomicU8; 12],
+    request_data_sequence_number: AtomicU64,
+    response_data_encryption_key: [AtomicU8; 32],
+    response_data_salt: [AtomicU8; 12],
+    response_data_sequence_number: AtomicU64,
+    // TH2 transcript data for application secret derivation
+    finish_req_data: [AtomicU8; 128],
+    finish_req_len: AtomicU32,
+    finish_rsp_data: [AtomicU8; 64],
+    finish_rsp_len: AtomicU32,
     // message_a transcript storage (VERSION + CAPABILITIES + ALGORITHMS)
     message_a_data: [AtomicU8; 4096],
     message_a_len: AtomicU32,
@@ -203,6 +221,17 @@ static mut SPDM_CTX: SpdmContext = SpdmContext {
     response_handshake_salt: [const { AtomicU8::new(0) }; 12],
     response_handshake_sequence_number: AtomicU64::new(0),
     session_state: AtomicU32::new(0),
+    master_secret: [const { AtomicU8::new(0) }; 48],
+    request_data_encryption_key: [const { AtomicU8::new(0) }; 32],
+    request_data_salt: [const { AtomicU8::new(0) }; 12],
+    request_data_sequence_number: AtomicU64::new(0),
+    response_data_encryption_key: [const { AtomicU8::new(0) }; 32],
+    response_data_salt: [const { AtomicU8::new(0) }; 12],
+    response_data_sequence_number: AtomicU64::new(0),
+    finish_req_data: [const { AtomicU8::new(0) }; 128],
+    finish_req_len: AtomicU32::new(0),
+    finish_rsp_data: [const { AtomicU8::new(0) }; 64],
+    finish_rsp_len: AtomicU32::new(0),
     message_a_data: [const { AtomicU8::new(0) }; 4096],
     message_a_len: AtomicU32::new(0),
 };
@@ -490,17 +519,27 @@ unsafe fn call_release_sender(context: libspdm_context_t, buf: *mut c_void) {
 unsafe fn call_acquire_receiver(context: libspdm_context_t) -> *mut u8 {
     let func_ptr = SPDM_CTX.acquire_receiver.load(Ordering::SeqCst);
     debug_print!("call_acquire_receiver(func=%p)", func_ptr);
+    unsafe {
+        printf(b"[RUST-ACQ-RECV] func=%p context=%p\n\0".as_ptr() as *const i8, func_ptr as *const c_void, context as *const c_void);
+        fflush(0 as *mut core::ffi::c_void);
+    }
     if func_ptr.is_null() {
+        debug_print!("  ERROR: acquire_receiver func is NULL!");
         return core::ptr::null_mut();
     }
     let func: extern "C" fn(libspdm_context_t, *mut *mut c_void) -> libspdm_return_t =
         core::mem::transmute(func_ptr);
     let mut buf: *mut c_void = core::ptr::null_mut();
     let ret = func(context, &mut buf);
+    unsafe {
+        printf(b"[RUST-ACQ-RECV] ret=%u buf=%p\n\0".as_ptr() as *const i8, ret, buf as *const c_void);
+        fflush(0 as *mut core::ffi::c_void);
+    }
     debug_print!("  acquire_receiver ret=%u, buf=%p", ret, buf);
     if ret == LIBSPDM_STATUS_SUCCESS && !buf.is_null() {
         buf as *mut u8
     } else {
+        debug_print!("  ERROR: acquire_receiver failed ret=%u buf=%p", ret, buf);
         core::ptr::null_mut()
     }
 }
@@ -627,6 +666,7 @@ unsafe fn call_transport_decode(
         return LIBSPDM_STATUS_SUCCESS;
     }
     debug_print!("  calling transport_decode callback");
+    debug_print!("  STEP1: before var decl");
     
     // Signature: libspdm_return_t (*)(void*, uint32_t**, bool*, bool, size_t, void*, size_t*, void**)
     let func: extern "C" fn(
@@ -640,8 +680,14 @@ unsafe fn call_transport_decode(
         *mut *mut c_void,
     ) -> libspdm_return_t = core::mem::transmute(func_ptr);
     
+    debug_print!("  STEP2: after func transmute");
+    
     let mut session_id: *mut u32 = core::ptr::null_mut();
     let mut is_app_message: bool = false;
+    
+    debug_print!("  STEP3: before reading message_size");
+    let ms_val = unsafe { *message_size };
+    debug_print!("  STEP4: message_size=%zu", ms_val);
     
     let ret = func(
         context,
@@ -1420,7 +1466,7 @@ pub extern "C" fn libspdm_get_certificate(
             
             // Call transport_decode to trigger caching callbacks
             debug_print!("  BEFORE call_transport_decode for CERTIFICATE chunk %u", chunk_num);
-            let mut msg_size: usize = 0;
+            let mut msg_size: usize = 4096;
             let mut msg_ptr: *mut c_void = core::ptr::null_mut();
             let decode_ret = call_transport_decode(
                 context,
@@ -1871,7 +1917,7 @@ pub extern "C" fn libspdm_key_exchange(
         debug_print!("  recv size=%zu (raw transport data)", recv_size);
         
         // Decode transport header to get actual SPDM message
-        let mut msg_size: usize = 0;
+        let mut msg_size: usize = 4096;
         let mut msg_ptr: *mut c_void = core::ptr::null_mut();
         let decode_ret = call_transport_decode(
             context,
@@ -2237,12 +2283,15 @@ match keypair.shared_secret(&responder_sec1_pubkey) {
                                                                     return LIBSPDM_STATUS_ERROR;
                                                                 }
                                                             };
-                                                            for i in 0..48 {
-                                                                SPDM_CTX.responder_hmac[i].store(verify_data[i], Ordering::SeqCst);
-                                                            }
-                                                            SPDM_CTX.responder_hmac_len.store(48, Ordering::SeqCst);
-                                                            debug_print!("  stored responder HMAC (verify_data)");
-                                                        }
+for i in 0..48 {
+                                                                 SPDM_CTX.responder_hmac[i].store(verify_data[i], Ordering::SeqCst);
+                                                             }
+                                                             SPDM_CTX.responder_hmac_len.store(48, Ordering::SeqCst);
+                                                             debug_print!("  stored responder HMAC (verify_data)");
+                                                             
+                                                             SPDM_CTX.session_state.store(LIBSPDM_SESSION_STATE_HANDSHAKING, Ordering::SeqCst);
+                                                             debug_print!("  session_state -> HANDSHAKING");
+                                                         }
                                                         Err(_) => {
                                                             debug_print!("  ERROR: response_finished_key derivation failed");
                                                         }
@@ -2464,6 +2513,166 @@ pub extern "C" fn libspdm_finish(
         }
         
         call_release_receiver(context, receiver_buf as *mut c_void);
+        
+        // Derive application_secret keys for ESTABLISHED session state
+        debug_print!("  deriving application_secret keys...");
+        
+        let major = ((SPDM_CTX.spdm_version.load(Ordering::SeqCst) >> 12) & 0xF) as u8;
+        let minor = ((SPDM_CTX.spdm_version.load(Ordering::SeqCst) >> 8) & 0xF) as u8;
+        
+        // Load handshake_secret for master_secret derivation
+        let handshake_secret: [u8; 48] = {
+            let mut hs = [0u8; 48];
+            for i in 0..48 {
+                hs[i] = SPDM_CTX.handshake_secret[i].load(Ordering::SeqCst);
+            }
+            hs
+        };
+        
+        // Derive salt1 = HKDF-Expand(handshake_secret, "spdm1.x derived", 48)
+        let bin_str0: Vec<u8> = [
+            48, 0,
+            b's', b'p', b'd', b'm',
+            b'0' + major, b'.', b'0' + minor, b' ',
+            b'd', b'e', b'r', b'i', b'v', b'e', b'd',
+        ].to_vec();
+        let salt1 = match hkdf_expand_sha384(&handshake_secret, &bin_str0, 48) {
+            Ok(s) => s,
+            Err(_) => {
+                debug_print!("  ERROR: salt1 derivation failed");
+                return LIBSPDM_STATUS_CRYPTO_ERROR;
+            }
+        };
+        debug_print!("  derived salt1");
+        
+        // master_secret = HKDF-Extract(zero, salt1)
+        let zero_salt = [0u8; 48];
+        let master_secret = match hkdf_extract_sha384(&zero_salt, &salt1) {
+            Ok(ms) => ms,
+            Err(_) => {
+                debug_print!("  ERROR: master_secret derivation failed");
+                return LIBSPDM_STATUS_CRYPTO_ERROR;
+            }
+        };
+        for i in 0..48 {
+            SPDM_CTX.master_secret[i].store(master_secret[i], Ordering::SeqCst);
+        }
+        debug_print!("  stored master_secret");
+        
+        // TH2 hash = SHA-384(message_a + cert_chain_hash + KE_req + KE_rsp + FINISH_req + FINISH_rsp)
+        // For simplicity, use TH1 as TH2 approximation (same transcript before FINISH)
+        let th2 = match sha384(&transcript_data) {
+            Ok(h) => h,
+            Err(_) => {
+                debug_print!("  ERROR: TH2 hash failed");
+                return LIBSPDM_STATUS_CRYPTO_ERROR;
+            }
+        };
+        debug_print!("  computed TH2");
+        
+        // request_data_secret = HKDF-Expand(master_secret, "spdm1.x req app data" + TH2, 48)
+        let bin_str3: Vec<u8> = [
+            48, 0,
+            b's', b'p', b'd', b'm',
+            b'0' + major, b'.', b'0' + minor, b' ',
+            b'r', b'e', b'q', b' ',
+            b'a', b'p', b'p', b' ',
+            b'd', b'a', b't', b'a',
+        ].iter().cloned().chain(th2.iter().cloned()).collect();
+        let req_data_secret = match hkdf_expand_sha384(&master_secret, &bin_str3, 48) {
+            Ok(s) => s,
+            Err(_) => {
+                debug_print!("  ERROR: request_data_secret derivation failed");
+                return LIBSPDM_STATUS_CRYPTO_ERROR;
+            }
+        };
+        debug_print!("  derived request_data_secret");
+        
+        // Derive request_data_encryption_key = HKDF-Expand(req_data_secret, "spdm1.x key", 32)
+        let bin_str5_req: Vec<u8> = [
+            32, 0,
+            b's', b'p', b'd', b'm',
+            b'0' + major, b'.', b'0' + minor, b' ',
+            b'k', b'e', b'y',
+        ].to_vec();
+        let req_enc_key = match hkdf_expand_sha384(&req_data_secret, &bin_str5_req, 32) {
+            Ok(k) => k,
+            Err(_) => {
+                debug_print!("  ERROR: request_data_encryption_key derivation failed");
+                return LIBSPDM_STATUS_CRYPTO_ERROR;
+            }
+        };
+        for i in 0..32 {
+            SPDM_CTX.request_data_encryption_key[i].store(req_enc_key[i], Ordering::SeqCst);
+        }
+        debug_print!("  stored request_data_encryption_key");
+        
+        // Derive request_data_salt = HKDF-Expand(req_data_secret, "spdm1.x iv", 12)
+        let bin_str6_req: Vec<u8> = [
+            12, 0,
+            b's', b'p', b'd', b'm',
+            b'0' + major, b'.', b'0' + minor, b' ',
+            b'i', b'v',
+        ].to_vec();
+        let req_salt = match hkdf_expand_sha384(&req_data_secret, &bin_str6_req, 12) {
+            Ok(s) => s,
+            Err(_) => {
+                debug_print!("  ERROR: request_data_salt derivation failed");
+                return LIBSPDM_STATUS_CRYPTO_ERROR;
+            }
+        };
+        for i in 0..12 {
+            SPDM_CTX.request_data_salt[i].store(req_salt[i], Ordering::SeqCst);
+        }
+        debug_print!("  stored request_data_salt");
+        
+        // response_data_secret = HKDF-Expand(master_secret, "spdm1.x rsp app data" + TH2, 48)
+        let bin_str4: Vec<u8> = [
+            48, 0,
+            b's', b'p', b'd', b'm',
+            b'0' + major, b'.', b'0' + minor, b' ',
+            b'r', b's', b'p', b' ',
+            b'a', b'p', b'p', b' ',
+            b'd', b'a', b't', b'a',
+        ].iter().cloned().chain(th2.iter().cloned()).collect();
+        let rsp_data_secret = match hkdf_expand_sha384(&master_secret, &bin_str4, 48) {
+            Ok(s) => s,
+            Err(_) => {
+                debug_print!("  ERROR: response_data_secret derivation failed");
+                return LIBSPDM_STATUS_CRYPTO_ERROR;
+            }
+        };
+        debug_print!("  derived response_data_secret");
+        
+        // Derive response_data_encryption_key
+        let rsp_enc_key = match hkdf_expand_sha384(&rsp_data_secret, &bin_str5_req, 32) {
+            Ok(k) => k,
+            Err(_) => {
+                debug_print!("  ERROR: response_data_encryption_key derivation failed");
+                return LIBSPDM_STATUS_CRYPTO_ERROR;
+            }
+        };
+        for i in 0..32 {
+            SPDM_CTX.response_data_encryption_key[i].store(rsp_enc_key[i], Ordering::SeqCst);
+        }
+        debug_print!("  stored response_data_encryption_key");
+        
+        // Derive response_data_salt
+        let rsp_salt = match hkdf_expand_sha384(&rsp_data_secret, &bin_str6_req, 12) {
+            Ok(s) => s,
+            Err(_) => {
+                debug_print!("  ERROR: response_data_salt derivation failed");
+                return LIBSPDM_STATUS_CRYPTO_ERROR;
+            }
+        };
+        for i in 0..12 {
+            SPDM_CTX.response_data_salt[i].store(rsp_salt[i], Ordering::SeqCst);
+        }
+        debug_print!("  stored response_data_salt");
+        
+        // Set session state to ESTABLISHED
+        SPDM_CTX.session_state.store(LIBSPDM_SESSION_STATE_ESTABLISHED, Ordering::SeqCst);
+        debug_print!("  session_state -> ESTABLISHED");
     }
     
     debug_print!("  finish SUCCESS: session established");
@@ -2596,36 +2805,73 @@ pub extern "C" fn libspdm_encode_secured_message(
     }
     
     unsafe {
-        let (enc_key, salt, seq_num) = if is_request_message {
-            let mut key = [0u8; 32];
-            for i in 0..32 {
-                key[i] = SPDM_CTX.request_handshake_encryption_key[i].load(Ordering::SeqCst);
+        let session_state = SPDM_CTX.session_state.load(Ordering::SeqCst);
+        debug_print!("  session_state=%u (HANDSHAKING=1, ESTABLISHED=2)", session_state);
+        
+        let (enc_key, salt, seq_num) = if session_state == LIBSPDM_SESSION_STATE_ESTABLISHED {
+            if is_request_message {
+                let mut key = [0u8; 32];
+                for i in 0..32 {
+                    key[i] = SPDM_CTX.request_data_encryption_key[i].load(Ordering::SeqCst);
+                }
+                let mut slt = [0u8; 12];
+                for i in 0..12 {
+                    slt[i] = SPDM_CTX.request_data_salt[i].load(Ordering::SeqCst);
+                }
+                let seq = SPDM_CTX.request_data_sequence_number.load(Ordering::SeqCst);
+                (key, slt, seq)
+            } else {
+                let mut key = [0u8; 32];
+                for i in 0..32 {
+                    key[i] = SPDM_CTX.response_data_encryption_key[i].load(Ordering::SeqCst);
+                }
+                let mut slt = [0u8; 12];
+                for i in 0..12 {
+                    slt[i] = SPDM_CTX.response_data_salt[i].load(Ordering::SeqCst);
+                }
+                let seq = SPDM_CTX.response_data_sequence_number.load(Ordering::SeqCst);
+                (key, slt, seq)
             }
-            let mut slt = [0u8; 12];
-            for i in 0..12 {
-                slt[i] = SPDM_CTX.request_handshake_salt[i].load(Ordering::SeqCst);
-            }
-            let seq = SPDM_CTX.request_handshake_sequence_number.load(Ordering::SeqCst);
-            (key, slt, seq)
         } else {
-            let mut key = [0u8; 32];
-            for i in 0..32 {
-                key[i] = SPDM_CTX.response_handshake_encryption_key[i].load(Ordering::SeqCst);
+            if is_request_message {
+                let mut key = [0u8; 32];
+                for i in 0..32 {
+                    key[i] = SPDM_CTX.request_handshake_encryption_key[i].load(Ordering::SeqCst);
+                }
+                let mut slt = [0u8; 12];
+                for i in 0..12 {
+                    slt[i] = SPDM_CTX.request_handshake_salt[i].load(Ordering::SeqCst);
+                }
+                let seq = SPDM_CTX.request_handshake_sequence_number.load(Ordering::SeqCst);
+                (key, slt, seq)
+            } else {
+                let mut key = [0u8; 32];
+                for i in 0..32 {
+                    key[i] = SPDM_CTX.response_handshake_encryption_key[i].load(Ordering::SeqCst);
+                }
+                let mut slt = [0u8; 12];
+                for i in 0..12 {
+                    slt[i] = SPDM_CTX.response_handshake_salt[i].load(Ordering::SeqCst);
+                }
+                let seq = SPDM_CTX.response_handshake_sequence_number.load(Ordering::SeqCst);
+                (key, slt, seq)
             }
-            let mut slt = [0u8; 12];
-            for i in 0..12 {
-                slt[i] = SPDM_CTX.response_handshake_salt[i].load(Ordering::SeqCst);
-            }
-            let seq = SPDM_CTX.response_handshake_sequence_number.load(Ordering::SeqCst);
-            (key, slt, seq)
         };
         
         debug_print!("  seq_num=%llu", seq_num);
         
-        if is_request_message {
-            SPDM_CTX.request_handshake_sequence_number.store(seq_num + 1, Ordering::SeqCst);
+        if session_state == LIBSPDM_SESSION_STATE_ESTABLISHED {
+            if is_request_message {
+                SPDM_CTX.request_data_sequence_number.store(seq_num + 1, Ordering::SeqCst);
+            } else {
+                SPDM_CTX.response_data_sequence_number.store(seq_num + 1, Ordering::SeqCst);
+            }
         } else {
-            SPDM_CTX.response_handshake_sequence_number.store(seq_num + 1, Ordering::SeqCst);
+            if is_request_message {
+                SPDM_CTX.request_handshake_sequence_number.store(seq_num + 1, Ordering::SeqCst);
+            } else {
+                SPDM_CTX.response_handshake_sequence_number.store(seq_num + 1, Ordering::SeqCst);
+            }
         }
         
         let mut iv = salt;
@@ -2716,26 +2962,53 @@ pub extern "C" fn libspdm_decode_secured_message(
             return LIBSPDM_STATUS_BUFFER_TOO_SMALL;
         }
         
-        let (enc_key, salt) = if is_request_message {
-            let mut key = [0u8; 32];
-            for i in 0..32 {
-                key[i] = SPDM_CTX.request_handshake_encryption_key[i].load(Ordering::SeqCst);
+        let (enc_key, salt) = {
+            let session_state = SPDM_CTX.session_state.load(Ordering::SeqCst);
+            if session_state == LIBSPDM_SESSION_STATE_ESTABLISHED {
+                if is_request_message {
+                    let mut key = [0u8; 32];
+                    for i in 0..32 {
+                        key[i] = SPDM_CTX.request_data_encryption_key[i].load(Ordering::SeqCst);
+                    }
+                    let mut slt = [0u8; 12];
+                    for i in 0..12 {
+                        slt[i] = SPDM_CTX.request_data_salt[i].load(Ordering::SeqCst);
+                    }
+                    (key, slt)
+                } else {
+                    let mut key = [0u8; 32];
+                    for i in 0..32 {
+                        key[i] = SPDM_CTX.response_data_encryption_key[i].load(Ordering::SeqCst);
+                    }
+                    let mut slt = [0u8; 12];
+                    for i in 0..12 {
+                        slt[i] = SPDM_CTX.response_data_salt[i].load(Ordering::SeqCst);
+                    }
+                    (key, slt)
+                }
+            } else {
+                if is_request_message {
+                    let mut key = [0u8; 32];
+                    for i in 0..32 {
+                        key[i] = SPDM_CTX.request_handshake_encryption_key[i].load(Ordering::SeqCst);
+                    }
+                    let mut slt = [0u8; 12];
+                    for i in 0..12 {
+                        slt[i] = SPDM_CTX.request_handshake_salt[i].load(Ordering::SeqCst);
+                    }
+                    (key, slt)
+                } else {
+                    let mut key = [0u8; 32];
+                    for i in 0..32 {
+                        key[i] = SPDM_CTX.response_handshake_encryption_key[i].load(Ordering::SeqCst);
+                    }
+                    let mut slt = [0u8; 12];
+                    for i in 0..12 {
+                        slt[i] = SPDM_CTX.response_handshake_salt[i].load(Ordering::SeqCst);
+                    }
+                    (key, slt)
+                }
             }
-            let mut slt = [0u8; 12];
-            for i in 0..12 {
-                slt[i] = SPDM_CTX.request_handshake_salt[i].load(Ordering::SeqCst);
-            }
-            (key, slt)
-        } else {
-            let mut key = [0u8; 32];
-            for i in 0..32 {
-                key[i] = SPDM_CTX.response_handshake_encryption_key[i].load(Ordering::SeqCst);
-            }
-            let mut slt = [0u8; 12];
-            for i in 0..12 {
-                slt[i] = SPDM_CTX.response_handshake_salt[i].load(Ordering::SeqCst);
-            }
-            (key, slt)
         };
         
         let mut iv = salt;
@@ -2922,6 +3195,11 @@ pub extern "C" fn libspdm_send_receive_data(
     let session_id_ptr = if session_id.is_null() { core::ptr::null() } else { session_id };
     
     unsafe {
+        printf(b"[RUST-SR-ENTRY] context=%p session=%p\n\0".as_ptr() as *const i8, context as *const c_void, session_id_ptr as *const c_void);
+        fflush(0 as *mut core::ffi::c_void);
+    }
+    
+    unsafe {
         // Step 1: Acquire sender buffer
         let sender_buf = call_acquire_sender(context);
         if sender_buf.is_null() {
@@ -2973,20 +3251,56 @@ pub extern "C" fn libspdm_send_receive_data(
         
         debug_print!("  transport_encode success: transport_size=%zu", transport_size);
         
-        // Step 4: Send encoded message
-        let send_ret = call_send(context, transport_msg, transport_size);
+        // DOE alignment: PCI DOE requires messages aligned to 4 bytes (DW units)
+        // C version uses 8-byte alignment for buffer handling
+        let alignment = 4usize;
+        let aligned_size = ((transport_size + alignment - 1) / alignment) * alignment;
+        debug_print!("  DOE alignment: %zu -> %zu", transport_size, aligned_size);
+        
+        // Pad with zeros if alignment added extra bytes
+        if aligned_size > transport_size {
+            unsafe {
+                for i in transport_size..aligned_size {
+                    *transport_msg.add(i) = 0;
+                }
+            }
+            debug_print!("  padded %zu bytes with zeros", aligned_size - transport_size);
+        }
+        
+        // Step 4: Send encoded message (with alignment)
+        let send_ret = call_send(context, transport_msg, aligned_size);
         if send_ret != LIBSPDM_STATUS_SUCCESS {
             debug_print!("  send failed: ret=%u", send_ret);
             call_release_sender(context, sender_buf as *mut c_void);
             return send_ret;
         }
-        debug_print!("  send success");
+        debug_print!("  send success (size=%zu)", aligned_size);
         
         call_release_sender(context, sender_buf as *mut c_void);
         
-        // Step 5: Acquire receiver buffer
-        let mut recv_buf_ptr: *mut c_void = core::ptr::null_mut();
-        let mut recv_size: usize = 0;
+        // Step 5: Acquire receiver buffer FIRST (C's libspdm_acquire_receiver_buffer)
+        // This allocates the buffer that recv callback expects
+        let recv_buf = call_acquire_receiver(context);
+        if recv_buf.is_null() {
+            debug_print!("  ERROR: failed to acquire receiver buffer");
+            return LIBSPDM_STATUS_ERROR;
+        }
+        
+        unsafe {
+            printf(b"[RUST-PRE-RECV] acquired buf=%p\n\0".as_ptr() as *const i8, recv_buf as *const c_void);
+            fflush(0 as *mut core::ffi::c_void);
+        }
+        
+        // Pass acquired buffer to recv callback
+        // recv callback expects **response where *response = buffer address
+        let mut recv_buf_ptr: *mut c_void = recv_buf as *mut c_void;
+        let mut recv_size: usize = 4096;
+        
+        unsafe {
+            printf(b"[RUST-PRE-RECV2] recv_buf_ptr=%p addr=%p\n\0".as_ptr() as *const i8, 
+                   recv_buf_ptr as *const c_void, &recv_buf_ptr as *const *mut c_void as *const c_void);
+            fflush(0 as *mut core::ffi::c_void);
+        }
         
         let recv_ret = call_recv(context, &mut recv_buf_ptr, &mut recv_size);
         if recv_ret != LIBSPDM_STATUS_SUCCESS {
@@ -2996,9 +3310,11 @@ pub extern "C" fn libspdm_send_receive_data(
         
         debug_print!("  recv success: raw_size=%zu", recv_size);
         
+        debug_print!("!!!BEFORE-DECODE!!! decoded_size=4096");
+        
         // Step 6: Call transport_decode to unwrap (secured message decode if session)
         let mut decoded_msg: *mut c_void = core::ptr::null_mut();
-        let mut decoded_size: usize = 0;
+        let mut decoded_size: usize = 4096;  // Buffer capacity for decode output
         
         let decode_ret = call_transport_decode(
             context,

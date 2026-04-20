@@ -140,10 +140,12 @@ static libspdm_return_t spdm_send_message(void *spdm_context,
 	}
 	info->exit_args.req_len = request_size;
 
-	printf("[C_DEBUG] SEND_YIELD: flags=0x%lx RSP_CACHE=%d REQ_SEND=%d\n",
+	printf("[C_DEBUG] SEND_YIELD: flags=0x%lx RSP_CACHE=%d REQ_SEND=%d protocol=%d is_sspdm=%d\n",
 	     (unsigned long)info->exit_args.flags,
 	     (info->exit_args.flags & RMI_DEV_COMM_EXIT_FLAGS_RSP_CACHE_BIT) ? 1 : 0,
-	     (info->exit_args.flags & RMI_DEV_COMM_EXIT_FLAGS_REQ_SEND_BIT) ? 1 : 0);
+	     (info->exit_args.flags & RMI_DEV_COMM_EXIT_FLAGS_REQ_SEND_BIT) ? 1 : 0,
+	     (int)info->exit_args.protocol,
+	     info->is_msg_sspdm ? 1 : 0);
 
 	/* Copy back the exit args to shared buf */
 	copy_back_exit_args_to_shared(info);
@@ -169,11 +171,17 @@ static libspdm_return_t spdm_receive_message(void *spdm_context,
 	uintptr_t buf_offset;
 	unsigned long resp_len = info->enter_args.resp_len;
 
+	printf("[C_RECV] ENTRY: resp_len=%lu status=%u response=%p send_recv_buf=%p\n", 
+	       resp_len, info->enter_args.status, (void*)*response, (void*)info->send_recv_buffer);
+	fflush(stdout);
+
 	(void)timeout;
 
 	info = spdm_to_dev_assign_info(spdm_context);
 
 	if ((uintptr_t)info->send_recv_buffer > (uintptr_t)*response) {
+		printf("[C_RECV] ERROR: send_recv_buffer > response\n");
+		fflush(stdout);
 		return LIBSPDM_STATUS_RECEIVE_FAIL;
 	}
 
@@ -824,6 +832,10 @@ spdm_transport_decode_message(void *spdm_context, uint32_t **session_id,
 	(void)is_app_message;
 	info = spdm_to_dev_assign_info(spdm_context);
 
+	printf("[C-DECODE-ENTRY] transport_size=%zu message_size=%zu ptr=%p\n",
+	       transport_message_size, *message_size, message_size);
+	fflush(stdout);
+
 	/*
 	 * As no transport headers are available, the type of the received
 	 * message is SPDM or SECURED_SPDM based on last sent request type.
@@ -1425,6 +1437,8 @@ static unsigned long dev_assign_communicate_cmd_cmn(unsigned long func_id, uintp
 	}
 
 	copy_enter_args_from_shared(info);
+
+	INFO("[EL0_APP] func_id=%lu session_id=0x%x\n", (unsigned long)func_id, info->session_id);
 
 	switch (func_id) {
 	case DEVICE_ASSIGN_APP_FUNC_ID_CONNECT_INIT:

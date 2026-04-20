@@ -19,7 +19,21 @@ int dev_tdisp_lock_main(struct dev_assign_info *info)
 	struct dev_assign_tdisp_params *tdisp_params = &info->dev_assign_op_params.tdisp_params;
 	uint8_t tdi_state;
 
+	printf("[C_TDISP_LOCK] ENTRY: param_type=%u (expected=%u)\n", 
+	       info->dev_assign_op_params.param_type, DEV_ASSIGN_OP_PARAMS_TDISP);
+	fflush(stdout);
+	
 	assert(info->dev_assign_op_params.param_type == DEV_ASSIGN_OP_PARAMS_TDISP);
+
+	/* Initialize DVSEC for Root Port access */
+	printf("[C_TDISP_LOCK] Calling dvsec_init...\n");
+	fflush(stdout);
+	if (dvsec_init(info) != 0) {
+		ERROR("%s: dvsec_init failed.\n", __func__);
+		return DEV_ASSIGN_STATUS_ERROR;
+	}
+	printf("[C_TDISP_LOCK] dvsec_init SUCCESS, calling pci_tdisp_get_version...\n");
+	fflush(stdout);
 
 	/* Initialize DVSEC for Root Port access */
 	if (dvsec_init(info) != 0) {
