@@ -522,6 +522,51 @@ unsafe fn call_recv(context: libspdm_context_t, buf: *mut *mut c_void, size: *mu
     ret
 }
 
+unsafe fn call_transport_encode(
+    context: libspdm_context_t,
+    session_id: *const u32,
+    message: *const u8,
+    message_size: usize,
+    buffer: *mut u8,
+    buffer_capacity: usize,
+) -> (libspdm_return_t, *mut u8, usize) {
+    let func_ptr = SPDM_CTX.transport_encode.load(Ordering::SeqCst);
+    debug_print!("call_transport_encode(func=%p, session=%p, msg_size=%zu, buf_cap=%zu)", 
+                 func_ptr, session_id, message_size, buffer_capacity);
+    if func_ptr.is_null() {
+        debug_print!("  transport_encode is NULL, returning raw message");
+        return (LIBSPDM_STATUS_SUCCESS, message as *mut u8, message_size);
+    }
+    debug_print!("  calling transport_encode callback");
+    
+    let func: extern "C" fn(
+        libspdm_context_t,
+        *const u32,
+        bool,
+        bool,
+        usize,
+        *const c_void,
+        *mut usize,
+        *mut *mut c_void,
+    ) -> libspdm_return_t = core::mem::transmute(func_ptr);
+    
+    let mut msg_buf_size = buffer_capacity;
+    let mut msg_buf_ptr = buffer as *mut c_void;
+    
+    let ret = func(
+        context,
+        session_id,
+        false,
+        true,
+        message_size,
+        message as *const c_void,
+        &mut msg_buf_size,
+        &mut msg_buf_ptr,
+    );
+    debug_print!("  transport_encode ret=%u, encoded_size=%zu", ret, msg_buf_size);
+    (ret, msg_buf_ptr as *mut u8, msg_buf_size)
+}
+
 unsafe fn call_transport_decode(
     context: libspdm_context_t,
     transport_msg: *mut c_void,
@@ -2570,16 +2615,54 @@ pub extern "C" fn libspdm_send_receive_data(
         return LIBSPDM_STATUS_ERROR;
     }
     
+    let session_id_ptr = if session_id == 0 { core::ptr::null() } else { &session_id as *const u32 };
+    
     unsafe {
-        // Step 1: Send the request
-        let send_ret = call_send(context, request, request_size);
+        // Step 1: Acquire sender buffer
+        let sender_buf = call_acquire_sender(context);
+        if sender_buf.is_null() {
+            debug_print!("  ERROR: failed to acquire sender buffer");
+            return LIBSPDM_STATUS_ERROR;
+        }
+        
+        // Step 2: Copy request to sender buffer (skip transport header space)
+        // Transport header size is typically 4 bytes for DOE
+        let transport_header_size = 4;
+        let transport_tail_size = 0;
+        let sender_capacity = 4096 - transport_header_size - transport_tail_size;
+        let spdm_request = sender_buf.add(transport_header_size);
+        core::ptr::copy_nonoverlapping(request, spdm_request as *mut u8, request_size);
+        
+        // Step 3: Call transport_encode to wrap message (DOE + secured message if session)
+        let (encode_ret, transport_msg, transport_size) = call_transport_encode(
+            context,
+            session_id_ptr,
+            spdm_request as *const u8,
+            request_size,
+            sender_buf,
+            sender_capacity + transport_header_size + transport_tail_size,
+        );
+        
+        if encode_ret != LIBSPDM_STATUS_SUCCESS {
+            debug_print!("  transport_encode failed: ret=%u", encode_ret);
+            call_release_sender(context, sender_buf as *mut c_void);
+            return encode_ret;
+        }
+        
+        debug_print!("  transport_encode success: transport_size=%zu", transport_size);
+        
+        // Step 4: Send encoded message
+        let send_ret = call_send(context, transport_msg, transport_size);
         if send_ret != LIBSPDM_STATUS_SUCCESS {
             debug_print!("  send failed: ret=%u", send_ret);
+            call_release_sender(context, sender_buf as *mut c_void);
             return send_ret;
         }
         debug_print!("  send success");
         
-        // Step 2: Receive the response
+        call_release_sender(context, sender_buf as *mut c_void);
+        
+        // Step 5: Acquire receiver buffer
         let mut recv_buf_ptr: *mut c_void = core::ptr::null_mut();
         let mut recv_size: usize = 0;
         
@@ -2589,20 +2672,43 @@ pub extern "C" fn libspdm_send_receive_data(
             return recv_ret;
         }
         
-        debug_print!("  recv success: size=%zu", recv_size);
+        debug_print!("  recv success: raw_size=%zu", recv_size);
         
-        // Step 3: Copy response to caller's buffer
-        if recv_size > *response_size {
-            debug_print!("  ERROR: response too large (recv=%zu, buf=%zu)", recv_size, *response_size);
-            *response_size = recv_size;
+        // Step 6: Call transport_decode to unwrap (secured message decode if session)
+        let mut decoded_msg: *mut c_void = core::ptr::null_mut();
+        let mut decoded_size: usize = 0;
+        
+        let decode_ret = call_transport_decode(
+            context,
+            recv_buf_ptr,
+            recv_size,
+            &mut decoded_size,
+            &mut decoded_msg,
+        );
+        
+        if decode_ret != LIBSPDM_STATUS_SUCCESS {
+            debug_print!("  transport_decode failed: ret=%u", decode_ret);
+            call_release_receiver(context, recv_buf_ptr);
+            return decode_ret;
+        }
+        
+        debug_print!("  transport_decode success: decoded_size=%zu", decoded_size);
+        
+        // Step 7: Copy decoded response to caller's buffer
+        if decoded_size > *response_size {
+            debug_print!("  ERROR: response too large (decoded=%zu, buf=%zu)", decoded_size, *response_size);
+            *response_size = decoded_size;
+            call_release_receiver(context, recv_buf_ptr);
             return LIBSPDM_STATUS_ERROR;
         }
         
-        if !recv_buf_ptr.is_null() && recv_size > 0 {
-            core::ptr::copy_nonoverlapping(recv_buf_ptr as *const u8, response, recv_size);
+        if !decoded_msg.is_null() && decoded_size > 0 {
+            core::ptr::copy_nonoverlapping(decoded_msg as *const u8, response, decoded_size);
         }
         
-        *response_size = recv_size;
+        *response_size = decoded_size;
+        
+        call_release_receiver(context, recv_buf_ptr);
     }
     
     debug_print!("  send_receive_data complete: resp_size=%zu", unsafe { *response_size });
