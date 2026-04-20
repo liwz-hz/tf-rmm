@@ -523,23 +523,23 @@ libspdm_return_t pci_ide_km_send_receive_data(void *_spdm_context,
 extern void printf(const int8_t *fmt);
 
 libspdm_return_t pci_tdisp_get_version(const void *_pci_doe_context,
-                                       void *_spdm_context,
-                                       const uint32_t *_session_id,
-                                       const void *_interface_id);
+                                       void *spdm_context,
+                                       const uint32_t *session_id,
+                                       const void *interface_id);
 
 libspdm_return_t pci_tdisp_get_capabilities(const void *_pci_doe_context,
-                                            void *_spdm_context,
-                                            const uint32_t *_session_id,
-                                            const void *_interface_id,
-                                            const void *_req_caps,
-                                            void *_rsp_caps);
+                                            void *spdm_context,
+                                            const uint32_t *session_id,
+                                            const void *interface_id,
+                                            const void *req_caps,
+                                            void *rsp_caps);
 
 libspdm_return_t pci_tdisp_lock_interface(const void *_pci_doe_context,
-                                          void *_spdm_context,
-                                          const uint32_t *_session_id,
-                                          const void *_interface_id,
-                                          const void *_lock_interface_param,
-                                          uint8_t *_start_interface_nonce);
+                                          void *spdm_context,
+                                          const uint32_t *session_id,
+                                          const void *interface_id,
+                                          const void *lock_interface_param,
+                                          uint8_t *start_interface_nonce);
 
 libspdm_return_t pci_tdisp_get_interface_report(const void *_pci_doe_context,
                                                 void *_spdm_context,

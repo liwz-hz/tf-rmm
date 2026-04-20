@@ -102,6 +102,52 @@ pub struct PciTdispHeader {
     pub interface_id: [u8; 12],
 }
 
+// TDISP get_version response (17 bytes minimum)
+#[repr(C, packed)]
+pub struct PciTdispVersionResponse {
+    pub header: PciTdispHeader,
+    pub version_num_count: u8,
+    pub version_num_entry: u8,
+}
+
+// TDISP get_capabilities request (20 bytes)
+#[repr(C, packed)]
+pub struct PciTdispGetCapabilitiesRequest {
+    pub header: PciTdispHeader,
+    pub req_caps: u32,
+}
+
+// TDISP capabilities response (48 bytes)
+#[repr(C, packed)]
+pub struct PciTdispCapabilitiesResponse {
+    pub header: PciTdispHeader,
+    pub dsm_caps: u32,
+    pub req_msg_supported: [u8; 16],
+    pub lock_interface_flags_supported: u16,
+    pub reserved: [u8; 3],
+    pub dev_addr_width: u8,
+    pub num_req_this: u8,
+    pub num_req_all: u8,
+}
+
+// TDISP lock_interface request (32 bytes)
+#[repr(C, packed)]
+pub struct PciTdispLockInterfaceRequest {
+    pub header: PciTdispHeader,
+    pub flags: u16,
+    pub default_stream_id: u8,
+    pub reserved1: u8,
+    pub mmio_reporting_offset: u64,
+    pub bind_p2p_address_mask: u64,
+}
+
+// TDISP lock_interface response (48 bytes)
+#[repr(C, packed)]
+pub struct PciTdispLockInterfaceResponse {
+    pub header: PciTdispHeader,
+    pub start_interface_nonce: [u8; 32],
+}
+
 // TDISP state response (17 bytes)
 #[repr(C, packed)]
 pub struct PciTdispStateResponse {
@@ -269,42 +315,200 @@ fn build_interface_id(function_id: u32) -> [u8; 12] {
     id
 }
 
-// Stub functions that are not needed for current flow
-
 #[no_mangle]
 pub extern "C" fn pci_tdisp_get_version(
     _pci_doe_context: *const c_void,
-    _spdm_context: *mut c_void,
-    _session_id: *const u32,
-    _interface_id: *const c_void,
+    spdm_context: *mut c_void,
+    session_id: *const u32,
+    interface_id: *const c_void,
 ) -> libspdm_return_t {
-    debug_print!("pci_tdisp_get_version (stub)");
+    debug_print!("pci_tdisp_get_version");
+    
+    if spdm_context.is_null() {
+        return LIBSPDM_STATUS_ERROR;
+    }
+    
+    let function_id = unsafe { *(interface_id as *const u32) };
+    
+    let request = PciTdispHeader {
+        version: PCI_TDISP_MESSAGE_VERSION_10,
+        message_type: PCI_TDISP_GET_VERSION,
+        reserved: [0, 0],
+        interface_id: build_interface_id(function_id),
+    };
+    
+    let mut response: PciTdispVersionResponse = unsafe { core::mem::zeroed() };
+    let mut rsp_size = core::mem::size_of::<PciTdispVersionResponse>();
+    
+    let status = pci_tdisp_send_receive_vdm(
+        spdm_context,
+        session_id,
+        PCI_TDISP_GET_VERSION,
+        &request as *const PciTdispHeader as *const u8,
+        16,
+        &mut response as *mut PciTdispVersionResponse as *mut u8,
+        &mut rsp_size,
+    );
+    
+    if status != LIBSPDM_STATUS_SUCCESS {
+        debug_print!("pci_tdisp_get_version: send_receive failed");
+        return status;
+    }
+    
+    if rsp_size != 17 {
+        debug_print!("pci_tdisp_get_version: invalid response size %zu", rsp_size);
+        return LIBSPDM_STATUS_ERROR;
+    }
+    
+    if response.header.message_type != PCI_TDISP_VERSION {
+        debug_print!("pci_tdisp_get_version: wrong message_type 0x%x", response.header.message_type);
+        return LIBSPDM_STATUS_ERROR;
+    }
+    
+    if response.version_num_count != 1 || response.version_num_entry != PCI_TDISP_MESSAGE_VERSION_10 {
+        debug_print!("pci_tdisp_get_version: invalid version");
+        return LIBSPDM_STATUS_ERROR;
+    }
+    
     LIBSPDM_STATUS_SUCCESS
 }
 
 #[no_mangle]
 pub extern "C" fn pci_tdisp_get_capabilities(
     _pci_doe_context: *const c_void,
-    _spdm_context: *mut c_void,
-    _session_id: *const u32,
-    _interface_id: *const c_void,
-    _req_caps: *const c_void,
-    _rsp_caps: *mut c_void,
+    spdm_context: *mut c_void,
+    session_id: *const u32,
+    interface_id: *const c_void,
+    req_caps: *const c_void,
+    rsp_caps: *mut c_void,
 ) -> libspdm_return_t {
-    debug_print!("pci_tdisp_get_capabilities (stub)");
+    debug_print!("pci_tdisp_get_capabilities");
+    
+    if spdm_context.is_null() || req_caps.is_null() || rsp_caps.is_null() {
+        return LIBSPDM_STATUS_ERROR;
+    }
+    
+    let function_id = unsafe { *(interface_id as *const u32) };
+    let req_caps_val = unsafe { *(req_caps as *const u32) };
+    
+    let request = PciTdispGetCapabilitiesRequest {
+        header: PciTdispHeader {
+            version: PCI_TDISP_MESSAGE_VERSION_10,
+            message_type: PCI_TDISP_GET_CAPABILITIES,
+            reserved: [0, 0],
+            interface_id: build_interface_id(function_id),
+        },
+        req_caps: req_caps_val,
+    };
+    
+    let mut response: PciTdispCapabilitiesResponse = unsafe { core::mem::zeroed() };
+    let mut rsp_size = core::mem::size_of::<PciTdispCapabilitiesResponse>();
+    
+    let status = pci_tdisp_send_receive_vdm(
+        spdm_context,
+        session_id,
+        PCI_TDISP_GET_CAPABILITIES,
+        &request as *const PciTdispGetCapabilitiesRequest as *const u8,
+        20,
+        &mut response as *mut PciTdispCapabilitiesResponse as *mut u8,
+        &mut rsp_size,
+    );
+    
+    if status != LIBSPDM_STATUS_SUCCESS {
+        debug_print!("pci_tdisp_get_capabilities: send_receive failed");
+        return status;
+    }
+    
+    if rsp_size != 48 {
+        debug_print!("pci_tdisp_get_capabilities: invalid response size");
+        return LIBSPDM_STATUS_ERROR;
+    }
+    
+    if response.header.message_type != PCI_TDISP_CAPABILITIES {
+        debug_print!("pci_tdisp_get_capabilities: wrong message_type");
+        return LIBSPDM_STATUS_ERROR;
+    }
+    
+    unsafe {
+        let rsp_caps_ptr = rsp_caps as *mut u8;
+        let resp_ptr = &response as *const PciTdispCapabilitiesResponse as *const u8;
+        core::ptr::copy_nonoverlapping(
+            resp_ptr.add(16),
+            rsp_caps_ptr,
+            32,
+        );
+    }
+    
     LIBSPDM_STATUS_SUCCESS
 }
 
 #[no_mangle]
 pub extern "C" fn pci_tdisp_lock_interface(
     _pci_doe_context: *const c_void,
-    _spdm_context: *mut c_void,
-    _session_id: *const u32,
-    _interface_id: *const c_void,
-    _lock_interface_param: *const c_void,
-    _start_interface_nonce: *mut u8,
+    spdm_context: *mut c_void,
+    session_id: *const u32,
+    interface_id: *const c_void,
+    lock_interface_param: *const c_void,
+    start_interface_nonce: *mut u8,
 ) -> libspdm_return_t {
-    debug_print!("pci_tdisp_lock_interface (stub)");
+    debug_print!("pci_tdisp_lock_interface");
+    
+    if spdm_context.is_null() || lock_interface_param.is_null() || start_interface_nonce.is_null() {
+        return LIBSPDM_STATUS_ERROR;
+    }
+    
+    let function_id = unsafe { *(interface_id as *const u32) };
+    
+    let mut request: PciTdispLockInterfaceRequest = unsafe { core::mem::zeroed() };
+    request.header.version = PCI_TDISP_MESSAGE_VERSION_10;
+    request.header.message_type = PCI_TDISP_LOCK_INTERFACE_REQ;
+    request.header.interface_id = build_interface_id(function_id);
+    
+    unsafe {
+        let req_ptr = &mut request as *mut PciTdispLockInterfaceRequest as *mut u8;
+        core::ptr::copy_nonoverlapping(
+            lock_interface_param as *const u8,
+            req_ptr.add(16),
+            16,
+        );
+    }
+    
+    let mut response: PciTdispLockInterfaceResponse = unsafe { core::mem::zeroed() };
+    let mut rsp_size = core::mem::size_of::<PciTdispLockInterfaceResponse>();
+    
+    let status = pci_tdisp_send_receive_vdm(
+        spdm_context,
+        session_id,
+        PCI_TDISP_LOCK_INTERFACE_REQ,
+        &request as *const PciTdispLockInterfaceRequest as *const u8,
+        32,
+        &mut response as *mut PciTdispLockInterfaceResponse as *mut u8,
+        &mut rsp_size,
+    );
+    
+    if status != LIBSPDM_STATUS_SUCCESS {
+        debug_print!("pci_tdisp_lock_interface: send_receive failed");
+        return status;
+    }
+    
+    if rsp_size != 48 {
+        debug_print!("pci_tdisp_lock_interface: invalid response size");
+        return LIBSPDM_STATUS_ERROR;
+    }
+    
+    if response.header.message_type != PCI_TDISP_LOCK_INTERFACE_RSP {
+        debug_print!("pci_tdisp_lock_interface: wrong message_type");
+        return LIBSPDM_STATUS_ERROR;
+    }
+    
+    unsafe {
+        core::ptr::copy_nonoverlapping(
+            response.start_interface_nonce.as_ptr(),
+            start_interface_nonce,
+            PCI_TDISP_START_INTERFACE_NONCE_SIZE,
+        );
+    }
+    
     LIBSPDM_STATUS_SUCCESS
 }
 
@@ -320,8 +524,6 @@ pub extern "C" fn pci_tdisp_get_interface_report(
     debug_print!("pci_tdisp_get_interface_report (stub)");
     LIBSPDM_STATUS_SUCCESS
 }
-
-// Real implementations
 
 #[no_mangle]
 pub extern "C" fn pci_tdisp_get_interface_state(
