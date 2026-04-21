@@ -369,7 +369,7 @@ pub extern "C" fn pci_tdisp_get_version(
         return status;
     }
     
-    if rsp_size != 17 {
+    if rsp_size != core::mem::size_of::<PciTdispVersionResponse>() {
         debug_print!("pci_tdisp_get_version: invalid response size %zu", rsp_size);
         return LIBSPDM_STATUS_ERROR;
     }
@@ -433,7 +433,7 @@ pub extern "C" fn pci_tdisp_get_capabilities(
         return status;
     }
     
-    if rsp_size != 48 {
+    if rsp_size != core::mem::size_of::<PciTdispCapabilitiesResponse>() {
         debug_print!("pci_tdisp_get_capabilities: invalid response size");
         return LIBSPDM_STATUS_ERROR;
     }
@@ -505,7 +505,7 @@ pub extern "C" fn pci_tdisp_lock_interface(
         return status;
     }
     
-    if rsp_size != 48 {
+    if rsp_size != core::mem::size_of::<PciTdispLockInterfaceResponse>() {
         debug_print!("pci_tdisp_lock_interface: invalid response size");
         return LIBSPDM_STATUS_ERROR;
     }
