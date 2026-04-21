@@ -1,0 +1,975 @@
+[RUST] init_context(context=0x57df3085d2e0)
+[RUST] register_device_io(context=0x57df3085d2e0, send=0x18c4e490, recv=0x18c4e5d0)
+[RUST] register_transport(context=0x57df3085d2e0, max=4096, hdr=0, tail=0, encode=0x18c4ee10, decode=0x18c4ea30)
+[RUST]   stored transport_decode=0x57df18c4ea30 (verified)
+[RUST] register_buffer(context=0x57df3085d2e0, sender_sz=4096, recv_sz=4096, acq_send=0x57df18c4dcc0, rel_send=0x57df18c4dce0, acq_recv=0x57df18c4ecd0, rel_recv=0x57df18c4ecc0)
+[RUST] get_scratch_buffer_size() -> 4096
+[RUST] set_scratch_buffer(context=0x57df3085d2e0, buf=0x57df308542e0, size=4096)
+[RUST] check_context(context=0x57df3085d2e0) -> state=0
+[RUST] set_data(context=0x57df3085d2e0, type=0, data=0x73860dffede6, size=2)
+[RUST]   set spdm_version=0x1200
+[RUST] set_data(context=0x57df3085d2e0, type=1, data=0x73860dffede8, size=2)
+[RUST]   set secured_version=0x1100
+[RUST] set_data(context=0x57df3085d2e0, type=3, data=0x73860dffede5, size=1)
+[RUST]   set ct_exponent=20
+[RUST] set_data(context=0x57df3085d2e0, type=2, data=0x73860dffedec, size=4)
+[RUST]   set cap_flags=0x82c2
+[RUST] set_data(context=0x57df3085d2e0, type=8, data=0x73860dffede5, size=1)
+[RUST]   set meas_spec=0x120001
+[RUST] set_data(context=0x57df3085d2e0, type=16, data=0x73860dffede5, size=1)
+[RUST]   set other_params=0x120002
+[RUST] set_data(context=0x57df3085d2e0, type=10, data=0x73860dffedec, size=4)
+[RUST]   set base_asym=0x94
+[RUST] set_data(context=0x57df3085d2e0, type=11, data=0x73860dffedec, size=4)
+[RUST]   set base_hash=0x3
+[RUST] set_data(context=0x57df3085d2e0, type=12, data=0x73860dffedea, size=2)
+[RUST]   set dhe=0x30018
+[RUST] set_data(context=0x57df3085d2e0, type=13, data=0x73860dffedea, size=2)
+[RUST]   set aead=0x30003
+[RUST] set_data(context=0x57df3085d2e0, type=15, data=0x73860dffedea, size=2)
+[RUST]   set key_schedule=0x30001
+[RUST] set_data(context=0x57df3085d2e0, type=14, data=0x73860dffedea, size=2)
+[RUST]   set req_base_asym=0x3000f
+[RUST] register_verify_cert(context=0x57df3085d2e0, func=0x18c4dcf0)
+[EL0_APP] func_id=2 session_id=0x0
+[RUST] init_connection(context=0x3085d2e0) - START
+[RUST]   send=0x18c4e490, recv=0x18c4e5d0, acq_send=0x18c4dcc0, acq_recv=0x18c4ecd0
+[RUST] call_acquire_sender(func=0x18c4dcc0)
+[RUST]   acquire_sender ret=0, buf=0x308532e0
+[RUST]   using SPDM version 0x10 for GET_VERSION
+[RUST]   sending GET_VERSION: 10 84 00 00
+[RUST] call_send(func=0x18c4e490, buf=0x308532e0, size=4)
+[C_DEBUG] SEND_YIELD: flags=0x4 RSP_CACHE=0 REQ_SEND=1 protocol=0 is_sspdm=0
+[RUST]   send ret=0, context=0x3085d2e0
+[RUST]   send returned 0
+[RUST]   saved request bytes for message_a: 10 84 00 00
+[RUST] call_acquire_receiver(func=0x18c4ecd0)
+[RUST-ACQ-RECV] func=0x57df18c4ecd0 context=0x57df3085d2e0
+[RUST-ACQ-RECV] ret=0 buf=0x57df308532e0
+[RUST]   acquire_receiver ret=0, buf=0x308532e0
+[RUST] call_recv(func=0x18c4e5d0)
+[C_RECV] ENTRY: resp_len=16 status=1 response=0x57df308532e0 send_recv_buf=0x57df308532e0
+[C_RECV] BEFORE_SERVICE_CALL: buf_offset=0 resp_addr=0x5da7a5f81000 resp_len_align=16
+[C_RECV] AFTER_SERVICE_CALL: rc=0
+Registering app: id=103, filename='/home/lmm/code/tf-rmm/build/Release/rmm_app_random.elf'
+Registering app: id=211, filename='/home/lmm/code/tf-rmm/build/Release/rmm_app_attestation.elf'
+Registering app: id=110, filename='/home/lmm/code/tf-rmm/build/Release/rmm_app_dev_assign.elf'
+Launched SPDM responder (pid 708330)
+Dynamic VA pool base address: 0x48000000000
+Reserved 9 pages. Remaining: 1791 pages
+Reserve mem: 9 pages at PA: 0x5da7a584c000 (alignment 0x1000)
+Static Low VA initialized. xlat tables allocated: 9 used: 5
+Reserved 514 pages. Remaining: 1277 pages
+Reserve mem: 514 pages at PA: 0x5da7a5855000 (alignment 0x1000)
+dyn_va_ctx: base_va=0x48000000000 base_level=1 max_va_size=0x8000000000
+Dynamic Low VA initialized. xlat tables allocated: 514 used: 514
+Booting RMM v.0.8.0(release) 98bf28c-dirty Built: Apr 21 2026 17:12:46 with GCC 13.3.0
+RMM-EL3 Interface v.2.0
+Boot Manifest Interface v.0.3
+RMI ABI revision v2.0
+RSI ABI revision v1.1
+FIRME version 0x10000 is supported
+Reserved 5 pages. Remaining: 1272 pages
+Reserve mem: 5 pages at PA: 0x5da7a5a57000 (alignment 0x1000)
+xlat_low_va_map: pa=0x5da7a5a57000 size=0x5000 -> va=0x48000000000 (pool_base=0x48000000000)
+Reserved 64 pages. Remaining: 1208 pages
+Reserve mem: 64 pages at PA: 0x5da7a5a5c000 (alignment 0x1000)
+xlat_low_va_map: pa=0x5da7a5a5c000 size=0x40000 -> va=0x48000005000 (pool_base=0x48000000000)
+Reserved 1 pages. Remaining: 1207 pages
+Reserve mem: 1 pages at PA: 0x5da7a5a9c000 (alignment 0x1000)
+xlat_low_va_map: pa=0x5da7a5a9c000 size=0x1000 -> va=0x48000045000 (pool_base=0x48000000000)
+No SMMU list available
+Reserved 173 pages. Remaining: 1034 pages
+Reserve mem: 173 pages at PA: 0x5da7a5a9d000 (alignment 0x1000)
+xlat_low_va_map: pa=0x5da7a5a9d000 size=0xad000 -> va=0x48000046000 (pool_base=0x48000000000)
+RMM_MEM_SCRUB_METHOD is default.
+RMM warm boot complete. token=5da7a5a57000
+[STAGE 0] RMM boot completed
+[STAGE 1] host_create_realm_and_activate() - Realm creation and RMM activation
+SMC_RMI_VERSION                   20000 > RMI_SUCCESS 20000 20000
+RMI Version is 0x20000 : 0x20000
+RMI_FEATURES(0) = 0x104130
+RMI_FEATURES(1) = 0x142a9
+RMI_FEATURES(2) = 0x1
+RMI_FEATURES(3) = 0x3
+RMI_FEATURES(4) = 0xfffe
+SMC_RMI_GRANULE_TRACKING_GET      0 > RMI_SUCCESS 0 1
+RMI_GRANULE_TRACKING_GET: category=0x0, tracking=0x1
+SMC_RMI_RMM_CONFIG_GET            5da7a5f65000 > RMI_SUCCESS
+RMI_RMM_CONFIG_GET succeeded
+SMC_RMI_RMM_CONFIG_SET            5da7a5f65000 > RMI_SUCCESS
+RMI_RMM_CONFIG_SET succeeded
+SMC_RMI_RMM_ACTIVATE              > RMI_SUCCESS
+SMC_RMI_REALM_CREATE              5da7a5f5f000 5da7a5f63000 > RMI_SUCCESS
+SMC_RMI_REC_CREATE                5da7a5f5f000 5da7a5f60000 5da7a5f61000 > RMI_INCOMPLETE
+      SMC_RMI_OP_MEM_DONATE       0 5da7a5f64000 10 > RMI_INCOMPLETE
+      SMC_RMI_OP_CONTINUE         0 0 > RMI_SUCCESS 10 0
+SMC_RMI_REALM_ACTIVATE            5da7a5f5f000 > RMI_SUCCESS
+[STAGE 1 DONE] Realm created, RMM activated
+[STAGE 2] host_pdev_probe_and_setup() - PDEV device discovery
+SMC_RMI_PDEV_AUX_COUNT            1 > RMI_SUCCESS 1
+PDEV create requires 1 aux pages
+SMC_RMI_PDEV_CREATE               5da7a5f7d000 5da7a5f84000 > RMI_SUCCESS
+SMC_RMI_PDEV_GET_STATE            5da7a5f7d000 > RMI_SUCCESS 0
+SMC_RMI_PDEV_GET_STATE            5da7a5f7d000 > RMI_SUCCESS 0
+SMC_RMI_PDEV_COMMUNICATE          5da7a5f7d000 5da7a5f7f000 > RMI_SUCCESS
+[SPDM TX] DOE header: vendor_id=0x1, type=1, len=3
+[SPDM TX] Request data: len=4 bytes
+0000: 10 84 00 00 
+[SPDM RX] DOE header: vendor_id=0x1, type=1, len=6
+[SPDM RX] Response data: len=16 bytes
+0000: 10 04 00 00 00 04 00 10 00 11 00 12 00 13 00 00 
+SMC_RMI_PDEV_GET_STATE            5da7a5f7d000 > RMI_SUCCESS 0
+SMC_RMI_PDEV_COMMUNICATE          5da7a5f7d000 5da7a5f7f000 > RMI_SUCCESS
+[SPDM TX] DOE header: vendor_id=0x1, type=1, len=7
+[SPDM TX] Request data: len=20 bytes
+0000: 12 e1 00 00 00 14 00 00 c2 82 00 00 00 10 00 00 
+0010: 00 10 00 00 
+[SPDM RX] DOE header: vendor_id=0x1, type=1, len=7
+[SPDM RX] Response data: len=20 bytes
+0000: 12 61 00 00 00 00 00 00 f7 fb 1a 00 00 12 00 00 
+0010: 00 12 00 00 
+SMC_RMI_PDEV_GET_STATE       [RUST]   recv ret=0, size=16
+[RUST]   recv returned 0, size=16
+[RUST]   VERSION actual SPDM size: 14 (DOE padded=16, count=4)
+[RUST]   saved VERSION to message_a: req=4, rsp=14, total=18
+[RUST] call_release_sender(func=0x18c4dce0, buf=0x308532e0)
+[RUST]   VERSION response OK: code=0x04, count=4
+[RUST]   VERSION entries: max 5 possible from size 16
+[RUST]   requester supports: major=1 minor=2 (stored=0x1200)
+[RUST]   responder entry 0: major=1 minor=0 (entry=0x1000)
+[RUST]   responder entry 1: major=1 minor=1 (entry=0x1100)
+[RUST]   responder entry 2: major=1 minor=2 (entry=0x1200)
+[RUST]   responder entry 3: major=1 minor=3 (entry=0x1300)
+[RUST]   responder entry 4: major=0 minor=0 (entry=0x0000)
+[RUST]   negotiated_version stored: 0x1200 (major=1, minor=2)
+[RUST]   connection_state -> AFTER_VERSION
+[RUST] call_acquire_sender(func=0x18c4dcc0)
+[RUST]   acquire_sender ret=0, buf=0x308532e0
+[RUST]   sending GET_CAPABILITIES: ver=0x12, size=20
+[RUST] call_send(func=0x18c4e490, buf=0x308532e0, size=20)
+[C_DEBUG] SEND_YIELD: flags=0x4 RSP_CACHE=0 REQ_SEND=1 protocol=0 is_sspdm=0
+[RUST]   send ret=0, context=0x3085d2e0
+[RUST] call_acquire_receiver(func=0x18c4ecd0)
+[RUST-ACQ-RECV] func=0x57df18c4ecd0 context=0x57df3085d2e0
+[RUST-ACQ-RECV] ret=0 buf=0x57df308532e0
+[RUST]   acquire_receiver ret=0, buf=0x308532e0
+[RUST] call_recv(func=0x18c4e5d0)
+[C_RECV] ENTRY: resp_len=20 status=1 response=0x57df308532e0 send_recv_buf=0x57df308532e0
+[C_RECV] BEFORE_SERVICE_CALL: buf_offset=0 resp_addr=0x5da7a5f81000 resp_len_align=24
+[C_RECV] AFTER_SERVICE_CALL: rc=0
+[RUST]   recv ret=0, size=20
+[RUST]   saved CAPABILITIES to message_a: req=20, rsp=20, total=58
+[RUST] call_release_sender(func=0x18c4dce0, buf=0x308532e0)
+[RUST]   CAPABILITIES response: data_transfer_size=4608, max_msg_size=4608
+[RUST] call_acquire_sender(func=0x18c4dcc0)
+[RUST]   acquire_sender ret=0, buf=0x308532e0
+[RUST]   struct_table DHE: type=2, alg=0x30018
+[RUST]   struct_table AEAD: type=3, alg=0x30003
+[RUST]   struct_table REQ_BASE_ASYM: type=4, alg=0x3000f
+[RUST]   struct_table KEY_SCHEDULE: type=5, alg=0x30001
+[RUST]   sending NEGOTIATE_ALGORITHMS: ver=0x12, size=48, tables=4
+[RUST]     base_asym=0x94, base_hash=0x3, meas_spec=0x1
+[RUST] call_send(func=0x18c4e490, buf=0x308532e0, size=48)
+[C_DEBUG] SEND_YIELD: flags=0x4 RSP_CACHE=0 REQ_SEND=1 protocol=0 is_sspdm=0
+[RUST]   send ret=0, context=0x3085d2e0
+[RUST] call_acquire_receiver(func=0x18c4ecd0)
+[RUST-ACQ-RECV] func=0x57df18c4ecd0 context=0x57df3085d2e0
+[RUST-ACQ-RECV] ret=0 buf=0x57df308532e0
+[RUST]   acquire_receiver ret=0, buf=0x308532e0
+[RUST] call_recv(func=0x18c4e5d0)
+[C_RECV] ENTRY: resp_len=52 status=1 response=0x57df308532e0 send_recv_buf=0x57df308532e0
+[C_RECV] BEFORE_SERVICE_CALL: buf_offset=0 resp_addr=0x5da7a5f81000 resp_len_align=56
+[C_RECV] AFTER_SERVICE_CALL: rc=0
+[90m[SPDM-EMU] spdm_responder_emu version 0.1[0m
+[90m[SPDM-EMU] trans - 0x2[0m
+[90m[SPDM-EMU] context_size - 0x3088[0m
+[90m[SPDM-EMU] Platform server listening on port 2323[0m
+[90m[SPDM-EMU] Platform port Receive command: 00 00 00 01 [0m
+[90m[SPDM-EMU] Platform port Receive transport_type: 00 00 00 02 [0m
+[90m[SPDM-EMU] Platform port Receive size: 00 00 00 0c [0m
+[90m[SPDM-EMU] Platform port Receive buffer:[0m
+[90m[SPDM-EMU]     01 00 01 00 03 00 00 00 10 84 00 00 [0m
+[90m[SPDM-EMU] SpdmReceiveRequest[.] ...[0m
+[90m[SPDM-EMU] SpdmReceiveRequest[0] msg SPDM_GET_VERSION(0x84), size (0x4): [0m
+[90m[SPDM-EMU] 0000: 10 84 00 00 [0m
+[90m[SPDM-EMU] SpdmSendResponse[0] ...[0m
+[90m[SPDM-EMU] SpdmSendResponse[0]: msg SPDM_VERSION(0x4), size (0xe): [0m
+[90m[SPDM-EMU] 0000: 10 04 00 00 00 04 00 10 00 11 00 12 00 13 [0m
+[90m[SPDM-EMU] Platform port Transmit command: 00 00 00 01 [0m
+[90m[SPDM-EMU] Platform port Transmit transport_type: 00 00 00 02 [0m
+[90m[SPDM-EMU] Platform port Transmit size: 00 00 00 18 [0m
+[90m[SPDM-EMU] Platform port Transmit buffer:[0m
+[90m[SPDM-EMU]     01 00 01 00 06 00 00 00 10 04 00 00 00 04 00 10 00 11 00 12 00 13 00 00 [0m
+[90m[SPDM-EMU] Platform port Receive command: 00 00 00 01 [0m
+[90m[SPDM-EMU] Platform port Receive transport_type: 00 00 00 02 [0m
+[90m[SPDM-EMU] Platform port Receive size: 00 00 00 1c [0m
+[90m[SPDM-EMU] Platform port Receive buffer:[0m
+[90m[SPDM-EMU]     01 00 01 00 07 00 00 00 12 e1 00 00 00 14 00 00 c2 82 00 00 00 10 00 00 00 10 00 00 [0m
+[90m[SPDM-EMU] SpdmReceiveRequest[.] ...[0m
+[90m[SPDM-EMU] SpdmReceiveRequest[0] msg SPDM_GET_CAPABILITIES(0xe1), size (0x14): [0m
+[90m[SPDM-EMU] 0000: 12 e1 00 00 00 14 00 00 c2 82 00 00 00 10 00 00 00 10 00 00 [0m
+[90m[SPDM-EMU] SpdmSendResponse[0] ...[0m
+[90m[SPDM-EMU] SpdmSendResponse[0]: msg SPDM_CAPABILITIES(0x61), size (0x14): [0m
+[90m[SPDM-EMU] 0000: 12 61 00 00 00 00 00 00 f7 fb 1a 00 00 12 00 00 00 12 00 00 [0m
+[90m[SPDM-EMU] Platform port Transmit command: 00 00 00 01 [0m
+[90m[SPDM-EMU] Platform port Transmit transport_type: 00 00 00 02 [0m
+[90m[SPDM-EMU] Platform port Transmit size: 00 00 00 1c [0m
+[90m[SPDM-EMU] Platform port Transmit buffer:[0m
+[90m[SPDM-EMU]     01 00 01 00 07 00 00 00 12 61 00 00 00 00 00 00 f7 fb 1a 00 00 12 00 00 00 12 00 00 [0m
+[90m[SPDM-EMU] Platform port Receive command: 00 00 00 01 [0m
+[90m[SPDM-EMU] Platform port Receive transport_type: 00 00 00 02 [0m
+[90m[SPDM-EMU] Platform port Receive size: 00 00 00 38 [0m
+[90m[SPDM-EMU] Platform port Receive buffer:[0m
+[90m[SPDM-EMU]     01 00 01 00 0e 00 00 00 12 e3 04 00 30 00 01 02 94 00 00 00 03 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 02 20 18 00 03 20 03 00 04 20 0f 00 05 20 01 00 [0m
+[90m[SPDM-EMU] SpdmReceiveRequest[.] ...[0m
+[90m[SPDM-EMU] SpdmReceiveRequest[0] msg SPDM_NEGOTIATE_ALGORITHMS(0xe3), size (0x30): [0m
+[90m[SPDM-EMU] 0000: 12 e3 04 00 30 00 01 02 94 00 00 00 03 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 [0m
+[90m[SPDM-EMU] 0020: 02 20 18 00 03 20 03 00 04 20 0f 00 05 20 01 00 [0m
+[90m[SPDM-EMU] SpdmSendResponse[0] ...[0m
+[90m[SPDM-EMU] slot_id - 0[0m
+[90m[SPDM-EMU] req_slot_id - 0[0m
+[90m[SPDM-EMU] Basic mutual authentication is a deprecated feature.[0m
+[90m[SPDM-EMU] SpdmSendResponse[0]: msg SPDM_ALGORITHMS(0x63), size (0x34): [0m
+[90m[SPDM-EMU] 0000: 12 63 04 00 34 00 01 02 08 00 00 00 80 00 00 00 02 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 [0m
+[90m[SPDM-EMU] 0020: 00 00 00 00 02 20 10 00 03 20 02 00 04 20 08 00 05 20 01 00 [0m
+[90m[SPDM-EMU] Platform port Transmit command: 00 00 00 01 [0m
+[90m[SPDM-EMU] Platform port Transmit transport_type: 00 00 00 02 [0m
+[90m[SPDM-EMU] Platform port Transmit size: 00 00 00 3c [0m
+[90m[SPDM-EMU] Platform port Transmit buffer:[0m
+[90m[SPDM-EMU]     01 00 01 00 0f 00 00 00 12 63 04 00 34 00 01 02 08 00 00 00 80 00 00 00 02 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 02 20 10 00 03 20 02 00 04 20 08 00 05 20 01 00 [0m
+[90m[SPDM-EMU] Platform port Receive command: 00 00 00 01 [0m
+[90m[SPDM-EMU] Platform port Receive transport_type: 00 00 00 02 [0m
+[90m[SPDM-EMU] Platform port Receive size: 00 00 00 10 [0m
+[90m[SPDM-EMU] Platform port Receive buffer:[0m
+[90m[SPDM-EMU]     01 00 01 00 04 00 00 00 12 82 00 00 00 00 00 04 [0m
+[90m[SPDM-EMU] SpdmReceiveRequest[.] ...[0m
+[90m[SPDM-EMU] SpdmReceiveRequest[0] msg SPDM_GET_CERTIFICATE(0x82), size (0x8): [0m
+[90m[SPDM-EMU] 0000: 12 82 00 00 00 00 00 04 [0m
+[90m[SPDM-EMU] SpdmSendResponse[0] ...[0m
+[90m[SPDM-EMU] SpdmSendResponse[0]: msg SPDM_CERTIFICATE(0x2), size (0x408): [0m
+[90m[SPDM-EMU] 0000: 12 02 00 00 00 04 37 02 37 06 00 00 71 0b a5 94 61 1d 3a 37 c9 10 a1 44 38 f6 d9 2e 7d b9 bb aa [0m
+[90m[SPDM-EMU] 0020: 6b ab 66 de bc ea b1 cf 23 a3 38 90 73 24 2e 5f 6c e9 f6 7b c9 8a 7f a2 fa 38 46 e2 30 82 01 d4 [0m
+[90m[SPDM-EMU] 0040: 30 82 01 5a a0 03 02 01 02 02 14 21 41 dd 4e ec f8 19 62 24 2e 7e d6 ae 64 cb 29 5d c4 90 51 30 [0m
+[90m[SPDM-EMU] 0060: 0a 06 08 2a 86 48 ce 3d 04 03 03 30 21 31 1f 30 1d 06 03 55 04 03 0c 16 44 4d 54 46 20 6c 69 62 [0m
+[90m[SPDM-EMU] 0080: 73 70 64 6d 20 45 43 50 33 38 34 20 43 41 30 1e 17 0d 32 33 30 34 32 30 30 31 31 33 35 34 5a 17 [0m
+[90m[SPDM-EMU] 00a0: 0d 33 33 30 34 31 37 30 31 31 33 35 34 5a 30 21 31 1f 30 1d 06 03 55 04 03 0c 16 44 4d 54 46 20 [0m
+[90m[SPDM-EMU] 00c0: 6c 69 62 73 70 64 6d 20 45 43 50 33 38 34 20 43 41 30 76 30 10 06 07 2a 86 48 ce 3d 02 01 06 05 [0m
+[90m[SPDM-EMU] 00e0: 2b 81 04 00 22 03 62 00 04 15 1c 0b 41 fb 87 d5 20 e0 7a f8 58 67 ef c0 ed 61 af 58 bf 92 52 33 [0m
+[90m[SPDM-EMU] 0100: ae 87 a9 7f 46 8b d4 b6 ef aa 2c 5b 0f 84 19 a0 8c 10 9b 81 4c d7 64 7e 32 6e 02 c5 fc 3d 25 7c [0m
+[90m[SPDM-EMU] 0120: a3 bc b5 ca a6 ce 04 11 8d bd ba 19 73 92 98 56 cc 99 24 48 17 ef b2 fb 54 3f f0 31 1d b4 a3 04 [0m
+[90m[SPDM-EMU] 0140: ea dc 22 ca c8 9a 2d fd fc a3 53 30 51 30 1d 06 03 55 1d 0e 04 16 04 14 4a e2 a4 0a c0 5d ae a2 [0m
+[90m[SPDM-EMU] 0160: 30 aa d0 57 70 d0 51 58 5f 5c a3 52 30 1f 06 03 55 1d 23 04 18 30 16 80 14 4a e2 a4 0a c0 5d ae [0m
+[90m[SPDM-EMU] 0180: a2 30 aa d0 57 70 d0 51 58 5f 5c a3 52 30 0f 06 03 55 1d 13 01 01 ff 04 05 30 03 01 01 ff 30 0a [0m
+[90m[SPDM-EMU] 01a0: 06 08 2a 86 48 ce 3d 04 03 03 03 68 00 30 65 02 30 2a 32 95 2c ff aa 1f 33 52 6f 6c fd 40 72 ff [0m
+[90m[SPDM-EMU] 01c0: 17 89 6e 03 5f bb 42 03 c4 6e 17 86 aa 98 a8 c1 20 12 d9 04 7c 16 ea 1f ae 8a ef 85 11 41 57 df [0m
+[90m[SPDM-EMU] 01e0: fc 02 31 00 a8 4c b9 90 4b 2f 6a 4f c2 8e d8 23 ad 81 de 4c 51 50 0b 27 17 8f 46 26 89 3b 9f f9 [0m
+[90m[SPDM-EMU] 0200: ce 48 e0 ee 28 fd 3f 06 e1 b3 4d 8f 6c 48 1c 2a 94 a9 d0 de 30 82 01 dc 30 82 01 61 a0 03 02 01 [0m
+[90m[SPDM-EMU] 0220: 02 02 01 01 30 0a 06 08 2a 86 48 ce 3d 04 03 03 30 21 31 1f 30 1d 06 03 55 04 03 0c 16 44 4d 54 [0m
+[90m[SPDM-EMU] 0240: 46 20 6c 69 62 73 70 64 6d 20 45 43 50 33 38 34 20 43 41 30 1e 17 0d 32 33 30 34 32 30 30 31 31 [0m
+[90m[SPDM-EMU] 0260: 34 30 35 5a 17 0d 33 33 30 34 31 37 30 31 31 34 30 35 5a 30 30 31 2e 30 2c 06 03 55 04 03 0c 25 [0m
+[90m[SPDM-EMU] 0280: 44 4d 54 46 20 6c 69 62 73 70 64 6d 20 45 43 50 33 38 34 20 69 6e 74 65 72 6d 65 64 69 61 74 65 [0m
+[90m[SPDM-EMU] 02a0: 20 63 65 72 74 30 76 30 10 06 07 2a 86 48 ce 3d 02 01 06 05 2b 81 04 00 22 03 62 00 04 31 7d 01 [0m
+[90m[SPDM-EMU] 02c0: 41 1a f7 e9 ea 5c 39 1e 37 6a 16 8d 2c 6e d9 7e ea 19 25 c5 97 40 dc ce 39 7f 92 46 cb fb 4b 44 [0m
+[90m[SPDM-EMU] 02e0: d8 f7 3d db 47 a6 44 bf 55 77 02 35 d1 37 27 68 a4 e8 04 4e 87 75 8f 59 57 a9 80 b8 b4 3c 97 ca [0m
+[90m[SPDM-EMU] 0300: fa 1b 13 a8 50 dc 0d 7a be 13 3d 31 5b fd d8 9f d6 fc aa 27 33 b8 92 5c 5b b8 0c 24 ca a3 5e 30 [0m
+[90m[SPDM-EMU] 0320: 5c 30 0c 06 03 55 1d 13 04 05 30 03 01 01 ff 30 0b 06 03 55 1d 0f 04 04 03 02 01 fe 30 1d 06 03 [0m
+[90m[SPDM-EMU] 0340: 55 1d 0e 04 16 04 14 00 0f 6f a7 6b 1f 34 03 0e 5a 21 c7 38 eb f1 a5 57 d5 57 cd 30 20 06 03 55 [0m
+[90m[SPDM-EMU] 0360: 1d 25 01 01 ff 04 16 30 14 06 08 2b 06 01 05 05 07 03 01 06 08 2b 06 01 05 05 07 03 02 30 0a 06 [0m
+[90m[SPDM-EMU] 0380: 08 2a 86 48 ce 3d 04 03 03 03 69 00 30 66 02 31 00 99 03 64 47 66 6c 30 6a b7 9d d3 5a 99 21 68 [0m
+[90m[SPDM-EMU] 03a0: ae 09 50 6f eb b4 fd ef 69 0b cf b2 56 4f b6 8f 1f 43 11 0c de f6 fd 77 fd a9 34 25 81 7e 97 64 [0m
+[90m[SPDM-EMU] 03c0: 4c 02 31 00 f9 c7 5c 54 3d 43 92 9a 30 3d 61 1a 1e f8 65 51 d4 d5 20 90 d2 85 f0 44 de 40 85 ea [0m
+[90m[SPDM-EMU] 03e0: 34 61 dd 6b fe 60 bd 0a c0 db 3d 43 2c ad d4 c4 e9 fa 22 33 30 82 02 47 30 82 01 cc a0 03 02 01 [0m
+[90m[SPDM-EMU] 0400: 02 02 01 03 30 0a 06 08 [0m
+[90m[SPDM-EMU] Platform port Transmit command: 00 00 00 01 [0m
+[90m[SPDM-EMU] Platform port Transmit transport_type: 00 00 00 02 [0m
+[90m[SPDM-EMU] Platform port Transmit size: 00 00 04 10 [0m
+[90m[SPDM-EMU] Platform port Transmit buffer:[0m
+     5da7a5f7d000 > RMI_SUCCESS 0
+SMC_RMI_PDEV_COMMUNICATE          5da7a5f7d000 5da7a5f7f000 > RMI_SUCCESS
+[SPDM TX] DOE header: vendor_id=0x1, type=1, len=14
+[SPDM TX] Request data: len=48 bytes
+0000: 12 e3 04 00 30 00 01 02 94 00 00 00 03 00 00 00 
+0010: 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 
+0020: 02 20 18 00 03 20 03 00 04 20 0f 00 05 20 01 00 
+[SPDM RX] DOE header: vendor_id=0x1, type=1, len=15
+[SPDM RX] Response data: len=52 bytes
+0000: 12 63 04 00 34 00 01 02 08 00 00 00 80 00 00 00 
+0010: 02 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 
+0020: 00 00 00 00 02 20 10 00 03 20 02 00 04 20 08 00 
+0030: 05 20 01 00 
+SMC_RMI_PDEV_GET_STATE            5da7a5f7d000 > RMI_SUCCESS 0
+SMC_RMI_PDEV_COMMUNICATE          5da7a5f7d000 5da7a5f7f000 > RMI_SUCCESS
+[SPDM TX] DOE header: vendor_id=0x1, type=1, len=4
+[SPDM TX] Request data: len=8 bytes
+0000: 12 82 00 00 00 00 00 04 
+[SPDM RX] DOE header: vendor_id=0x1, type=1, len=260
+[SPDM RX] Response data: len=1032 bytes
+0000: 12 02 00 00 00 04 37 02 37 06 00 00 71 0b a5 94 
+0010: 61 1d 3a 37 c9 10 a1 44 38 f6 d9 2e 7d b9 bb aa 
+0020: 6b ab 66 de bc ea b1 cf 23 a3 38 90 73 24 2e 5f 
+0030: 6c e9 f6 7b c9 8a 7f a2 fa 38 46 e2 30 82 01 d4 
+0040: 30 82 01 5a a0 03 02 01 02 02 14 21 41 dd 4e ec 
+0050: f8 19 62 24 2e 7e d6 ae 64 cb 29 5d c4 90 51 30 
+0060: 0a 06 08 2a 86 48 ce 3d 04 03 03 30 21 31 1f 30 
+0070: 1d 06 03 55 04 03 0c 16 44 4d 54 46 20 6c 69 62 
+0080: 73 70 64 6d 20 45 43 50 33 38 34 20 43 41 30 1e 
+0090: 17 0d 32 33 30 34 32 30 30 31 31 33 35 34 5a 17 
+00a0: 0d 33 33 30 34 31 37 30 31 31 33 35 34 5a 30 21 
+00b0: 31 1f 30 1d 06 03 55 04 03 0c 16 44 4d 54 46 20 
+00c0: 6c 69 62 73 70 64 6d 20 45 43 50 33 38 34 20 43 
+00d0: 41 30 76 30 10 06 07 2a 86 48 ce 3d 02 01 06 05 
+00e0: 2b 81 04 00 22 03 62 00 04 15 1c 0b 41 fb 87 d5 
+00f0: 20 e0 7a f8 58 67 ef c0 ed 61 af 58 bf 92 52 33 
+0100: ae 87 a9 7f 46 8b d4 b6 ef aa 2c 5b 0f 84 19 a0 
+0110: 8c 10 9b 81 4c d7 64 7e 32 6e 02 c5 fc 3d 25 7c 
+0120: a3 bc b5 ca a6 ce 04 11 8d bd ba 19 73 92 98 56 
+0130: cc 99 24 48 17 ef b2 fb 54 3f f0 31 1d b4 a3 04 
+0140: ea dc 22 ca c8 9a 2d fd fc a3 53 30 51 30 1d 06 
+0150: 03 55 1d 0e 04 16 04 14 4a e2 a4 0a c0 5d ae a2 
+0160: 30 aa d0 57 70 d0 51 58 5f 5c a3 52 30 1f 06 03 
+0170: 55 1d 23 04 18 30 16 80 14 4a e2 a4 0a c0 5d ae 
+0180: a2 30 aa d0 57 70 d0 51 58 5f 5c a3 52 30 0f 06 
+0190: 03 55 1d 13 01 01 ff 04 05 30 03 01 01 ff 30 0a 
+01a0: 06 08 2a 86 48 ce 3d 04 03 03 03 68 00 30 65 02 
+01b0: 30 2a 32 95 2c ff aa 1f 33 52 6f 6c fd 40 72 ff 
+01c0: 17 89 6e 03 5f bb 42 03 c4 6e 17 86 aa 98 a8 c1 
+01d0: 20 12 d9 04 7c 16 ea 1f ae 8a ef 85 11 41 57 df 
+01e0: fc 02 31 00 a8 4c b9 90 4b 2f 6a 4f c2 8e d8 23 
+01f0: ad 81 de 4c 51 50 0b 27 17 8f 46 26 89 3b 9f f9 
+0200: ce 48 e0 ee 28 fd 3f 06 e1 b3 4d 8f 6c 48 1c 2a 
+0210: 94 a9 d0 de 30 82 01 dc 30 82 01 61 a0 03 02 01 
+0220: 02 02 01 01 30 0a 06 08 2a 86 48 ce 3d 04 03 03 
+0230: 30 21 31 1f 30 1d 06 03 55 04 03 0c 16 44 4d 54 
+0240: 46 20 6c 69 62 73 70 64 6d 20 45 43 50 33 38 34 
+0250: 20 43 41 30 1e 17 0d 32 33 30 34 32 30 30 31 31 
+0260: 34 30 35 5a 17 0d 33 33 30 34 31 37 30 31 31 34 
+0270: 30 35 5a 30 30 31 2e 30 2c 06 03 55 04 03 0c 25 
+0280: 44 4d 54 46 20 6c 69 62 73 70 64 6d 20 45 43 50 
+0290: 33 38 34 20 69 6e 74 65 72 6d 65 64 69 61 74 65 
+02a0: 20 63 65 72 74 30 76 30 10 06 07 2a 86 48 ce 3d 
+02b0: 02 01 06 05 2b 81 04 00 22 03 62 00 04 31 7d 01 
+02c0: 41 1a f7 e9 ea 5c 39 1e 37 6a 16 8d 2c 6e d9 7e 
+02d0: ea 19 25 c5 97 40 dc ce 39 7f 92 46 cb fb 4b 44 
+02e0: d8 f7 3d db 47 a6 44 bf 55 77 02 35 d1 37 27 68 
+02f0: a4 e8 04 4e 87 75 8f 59 57 a9 80 b8 b4 3c 97 ca 
+0300: fa 1b 13 a8 50 dc 0d 7a be 13 3d 31 5b fd d8 9f 
+0310: d6 fc aa 27 33 b8 92 5c 5b b8 0c 24 ca a3 5e 30 
+0320: 5c 30 0c 06 03 55 1d 13 04 05 30 03 01 01 ff 30 
+0330: 0b 06 03 55 1d 0f 04 04 03 02 01 fe 30 1d 06 03 
+0340: 55 1d 0e 04 16 04 14 00 0f 6f a7 6b 1f 34 03 0e 
+0350: 5a 21 c7 38 eb f1 a5 57 d5 57 cd 30 20 06 03 55 
+0360: 1d 25 01 01 ff 04 16 30 14 06 08 2b 06 01 05 05 
+0370: 07 03 01 06 08 2b 06 01 05 05 07 03 02 30 0a 06 
+0380: 08 2a 86 48 ce 3d 04 03 03[RUST]   recv ret=0, size=52
+[RUST]   saved ALGORITHMS to message_a: req=48, rsp=52, total=158
+[RUST] call_release_sender(func=0x18c4dce0, buf=0x308532e0)
+[RUST]   ALGORITHMS response OK: code=0x63
+[RUST]   ALGORITHMS selected: base_asym=0x80, base_hash=0x2
+[RUST]   connection_state -> NEGOTIATED
+[RUST] init_connection() - SUCCESS
+[RUST] get_data(context=0x57df3085d2e0, type=5, data=0x73860dffed84, size=0x73860dffed88)
+[RUST]   get data_transfer_size=4608
+[RUST] get_certificate(context=0x3085d2e0, slot=0)
+[RUST]   max_cert_size=65535, cert_chain=(nil)
+[RUST]   Certificate retrieval loop START: max_cert_size=65535
+[RUST]   DEBUG: cert_chain param=(nil), cert_chain_size param=0xdffed88
+[RUST]   DEBUG: loop iteration 1 start
+[RUST] call_acquire_sender(func=0x18c4dcc0)
+[RUST]   acquire_sender ret=0, buf=0x308532e0
+[RUST]   === CHUNK 1 START: offset=0, request_len=1024 ===
+[RUST]   sending GET_CERTIFICATE: offset=0, length=1024
+[RUST] call_send(func=0x18c4e490, buf=0x308532e0, size=8)
+[C_DEBUG] SEND_YIELD: flags=0x4 RSP_CACHE=0 REQ_SEND=1 protocol=0 is_sspdm=0
+[RUST]   send ret=0, context=0x3085d2e0
+[RUST] call_acquire_receiver(func=0x18c4ecd0)
+[RUST-ACQ-RECV] func=0x57df18c4ecd0 context=0x57df3085d2e0
+[RUST-ACQ-RECV] ret=0 buf=0x57df308532e0
+[RUST]   acquire_receiver ret=0, buf=0x308532e0
+[RUST] call_recv(func=0x18c4e5d0)
+[C_RECV] ENTRY: resp_len=1032 status=1 response=0x57df308532e0 send_recv_buf=0x57df308532e0
+[C_RECV] BEFORE_SERVICE_CALL: buf_offset=0 resp_addr=0x5da7a5f81000 resp_len_align=1032
+[C_RECV] AFTER_SERVICE_CALL: rc=0
+[90m[SPDM-EMU]     01 00 01 00 04 01 00 00 12 02 00 00 00 04 37 02 37 06 00 00 71 0b a5 94 61 1d 3a 37 c9 10 a1 44 38 f6 d9 2e 7d b9 bb aa 6b ab 66 de bc ea b1 cf 23 a3 38 90 73 24 2e 5f 6c e9 f6 7b c9 8a 7f a2 fa 38 46 e2 30 82 01 d4 30 82 01 5a a0 03 02 01 02 02 14 21 41 dd 4e ec f8 19 62 24 2e 7e d6 ae 64 cb 29 5d c4 90 51 30 0a 06 08 2a 86 48 ce 3d 04 03 03 30 21 31 1f 30 1d 06 03 55 04 03 0c 16 44 4d 54 46 20 6c 69 62 73 70 64 6d 20 45 43 50 33 38 34 20 43 41 30 1e 17 0d 32 33 30 34 32 30 30 31 31 33 35 34 5a 17 0d 33 33 30 34 31 37 30 31 31 33 35 34 5a 30 21 31 1f 30 1d 06 03 55 04 03 0c 16 44 4d 54 46 20 6c 69 62 73 70 64 6d 20 45 43 50 33 38 34 20 43 41 30 76 30 10 06 07 2a 86 48 ce 3d 02 01 06 05 2b 81 04 00 22 03 62 00 04 15 1c 0b 41 fb 87 d5 20 e0 7a f8 58 67 ef c0 ed 61 af 58 bf 92 52 33 ae 87 a9 7f 46 8b d4 b6 ef aa 2c 5b 0f 84 19 a0 8c 10 9b 81 4c d7 64 7e 32 6e 02 c5 fc 3d 25 7c a3 bc b5 ca a6 ce 04 11 8d bd ba 19 73 92 98 56 cc 99 24 48 17 ef b2 fb 54 3f f0 31 1d b4 a3 04 ea dc 22 ca c8 9a 2d fd fc a3 53 30 51 30 1d 06 03 55 1d 0e 04 16 04 14 4a e2 a4 0a c0 5d ae a2 30 aa d0 57 70 d0 51 58 5f 5c a3 52 30 1f 06 03 55 1d 23 04 18 30 16 80 14 4a e2 a4 0a c0 5d ae a2 30 aa d0 57 70 d0 51 58 5f 5c a3 52 30 0f 06 03 55 1d 13 01 01 ff 04 05 30 03 01 01 ff 30 0a 06 08 2a 86 48 ce 3d 04 03 03 03 68 00 30 65 02 30 2a 32 95 2c ff aa 1f 33 52 6f 6c fd 40 72 ff 17 89 6e 03 5f bb 42 03 c4 6e 17 86 aa 98 a8 c1 20 12 d9 04 7c 16 ea 1f ae 8a ef 85 11 41 57 df fc 02 31 00 a8 4c b9 90 4b 2f 6a 4f c2 8e d8 23 ad 81 de 4c 51 50 0b 27 17 8f 46 26 89 3b 9f f9 ce 48 e0 ee 28 fd 3f 06 e1 b3 4d 8f 6c 48 1c 2a 94 a9 d0 de 30 82 01 dc 30 82 01 61 a0 03 02 01 02 02 01 01 30 0a 06 08 2a 86 48 ce 3d 04 03 03 30 21 31 1f 30 1d 06 03 55 04 03 0c 16 44 4d 54 46 20 6c 69 62 73 70 64 6d 20 45 43 50 33 38 34 20 43 41 30 1e 17 0d 32 33 30 34 32 30 30 31 31 34 30 35 5a 17 0d 33 33 30 34 31 37 30 31 31 34 30 35 5a 30 30 31 2e 30 2c 06 03 55 04 03 0c 25 44 4d 54 46 20 6c 69 62 73 70 64 6d 20 45 43 50 33 38 34 20 69 6e 74 65 72 6d 65 64 69 61 74 65 20 63 65 72 74 30 76 30 10 06 07 2a 86 48 ce 3d 02 01 06 05 2b 81 04 00 22 03 62 00 04 31 7d 01 41 1a f7 e9 ea 5c 39 1e 37 6a 16 8d 2c 6e d9 7e ea 19 25 c5 97 40 dc ce 39 7f 92 46 cb fb 4b 44 d8 f7 3d db 47 a6 44 bf 55 77 02 35 d1 37 27 68 a4 e8 04 4e 87 75 8f 59 57 a9 80 b8 b4 3c 97 ca fa 1b 13 a8 50 dc 0d 7a be 13 3d 31 5b fd d8 9f d6 fc aa 27 33 b8 92 5c 5b b8 0c 24 ca a3 5e 30 5c 30 0c 06 03 55 1d 13 04 05 30 03 01 01 ff 30 0b 06 03 55 1d 0f 04 04 03 02 01 fe 30 1d 06 03 55 1d 0e 04 16 04 14 00 0f 6f a7 6b 1f 34 03 0e 5a 21 c7 38 eb f1 a5 57 d5 57 cd 30 20 06 03 55 1d 25 01 01 ff 04 16 30 14 06 08 2b 06 01 05 05 07 03 01 06 08 2b 06 01 05 05 07 03 02 30 0a 06 08 2a 86 48 ce 3d 04 03 03 03 69 00 30 66 02 31 00 99 03 64 47 66 6c 30 6a b7 9d d3 5a 99 21 68 ae 09 50 6f eb b4 fd ef 69 0b cf b2 56 4f b6 8f 1f 43 11 0c de f6 fd 77 fd a9 34 25 81 7e 97 64 4c 02 31 00 f9 c7 5c 54 3d 43 92 9a 30 3d 61 1a 1e f8 65 51 d4 d5 20 90 d2 85 f0 44 de 40 85 ea 34 61 dd 6b fe 60 bd 0a c0 db 3d 43 2c ad d4 c4 e9 fa 22 33 30 82 02 47 30 82 01 cc a0 03 02 01 02 02 01 03 30 0a 06 08 [0m
+[90m[SPDM-EMU] Platform port Receive command: 00 00 00 01 [0m
+[90m[SPDM-EMU] Platform port Receive transport_type: 00 00 00 02 [0m
+[90m[SPDM-EMU] Platform port Receive size: 00 00 00 10 [0m
+[90m[SPDM-EMU] Platform port Receive buffer:[0m
+[90m[SPDM-EMU]     01 00 01 00 04 00 00 00 12 82 00 00 00 04 37 02 [0m
+[90m[SPDM-EMU] SpdmReceiveRequest[.] ...[0m
+[90m[SPDM-EMU] SpdmReceiveRequest[0] msg SPDM_GET_CERTIFICATE(0x82), size (0x8): [0m
+[90m[SPDM-EMU] 0000: 12 82 00 00 00 04 37 02 [0m
+[90m[SPDM-EMU] SpdmSendResponse[0] ...[0m
+[90m[SPDM-EMU] SpdmSendResponse[0]: msg SPDM_CERTIFICATE(0x2), size (0x23f): [0m
+[90m[SPDM-EMU] 0000: 12 02 00 00 37 02 00 00 2a 86 48 ce 3d 04 03 03 30 30 31 2e 30 2c 06 03 55 04 03 0c 25 44 4d 54 [0m
+[90m[SPDM-EMU] 0020: 46 20 6c 69 62 73 70 64 6d 20 45 43 50 33 38 34 20 69 6e 74 65 72 6d 65 64 69 61 74 65 20 63 65 [0m
+[90m[SPDM-EMU] 0040: 72 74 30 1e 17 0d 32 33 30 39 31 32 30 37 31 31 33 33 5a 17 0d 33 33 30 39 30 39 30 37 31 31 33 [0m
+[90m[SPDM-EMU] 0060: 33 5a 30 2d 31 2b 30 29 06 03 55 04 03 0c 22 44 4d 54 46 20 6c 69 62 73 70 64 6d 20 45 43 50 33 [0m
+[90m[SPDM-EMU] 0080: 38 34 20 72 65 73 70 6f 6e 64 65 72 20 63 65 72 74 30 76 30 10 06 07 2a 86 48 ce 3d 02 01 06 05 [0m
+[90m[SPDM-EMU] 00a0: 2b 81 04 00 22 03 62 00 04 0d 1c b9 20 1c dc ed c8 64 e9 70 a3 62 12 da d4 fe 59 94 ce bd ae d7 [0m
+[90m[SPDM-EMU] 00c0: d2 94 e4 e3 11 88 78 b9 88 c0 ed 5b e1 41 4a df 28 db 49 0f 38 81 52 68 b5 4c 6a 11 0b 58 b1 9c [0m
+[90m[SPDM-EMU] 00e0: c1 4d 47 41 14 1f 6d d6 57 ac a3 9f d1 b9 64 de 07 11 e8 31 78 de 75 3a b7 2c 15 56 ea f5 20 63 [0m
+[90m[SPDM-EMU] 0100: 93 0f 33 a9 71 a3 7e 78 19 a3 81 bc 30 81 b9 30 0c 06 03 55 1d 13 01 01 ff 04 02 30 00 30 0b 06 [0m
+[90m[SPDM-EMU] 0120: 03 55 1d 0f 04 04 03 02 05 e0 30 1d 06 03 55 1d 0e 04 16 04 14 14 3c 4f 66 c7 d7 60 40 7f 67 c1 [0m
+[90m[SPDM-EMU] 0140: 95 68 b3 87 28 3e c5 23 83 30 31 06 03 55 1d 11 04 2a 30 28 a0 26 06 0a 2b 06 01 04 01 83 1c 82 [0m
+[90m[SPDM-EMU] 0160: 12 01 a0 18 0c 16 41 43 4d 45 3a 57 49 44 47 45 54 3a 31 32 33 34 35 36 37 38 39 30 30 2a 06 03 [0m
+[90m[SPDM-EMU] 0180: 55 1d 25 01 01 ff 04 20 30 1e 06 08 2b 06 01 05 05 07 03 01 06 08 2b 06 01 05 05 07 03 02 06 08 [0m
+[90m[SPDM-EMU] 01a0: 2b 06 01 05 05 07 03 09 30 1e 06 0a 2b 06 01 04 01 83 1c 82 12 06 04 10 30 0e 30 0c 06 0a 2b 06 [0m
+[90m[SPDM-EMU] 01c0: 01 04 01 83 1c 82 12 02 30 0a 06 08 2a 86 48 ce 3d 04 03 03 03 69 00 30 66 02 31 00 af 75 02 a9 [0m
+[90m[SPDM-EMU] 01e0: b3 a6 47 4a 6e f4 0c b0 85 07 fc 3c 53 9d 29 b0 09 c2 b9 b3 f3 96 b9 99 be c5 75 9c ac 4f c3 8a [0m
+[90m[SPDM-EMU] 0200: 7a 24 7d 17 f7 cb 2a 71 14 57 3e 92 02 31 00 d3 57 af 94 68 e1 02 b6 51 50 0c 4a 74 97 72 37 b5 [0m
+[90m[SPDM-EMU] 0220: 03 ff 58 80 e0 f5 eb ae 1e 81 d8 d5 84 3d 18 83 60 fe 07 cd 43 2d 27 bd f5 a4 a5 19 7f 5d 09 [0m
+[RUST]   recv ret=0, size=1032
+[RUST] call_release_sender(func=0x18c4dce0, buf=0x308532e0)
+[RUST]   BEFORE call_transport_decode for CERTIFICATE chunk 1
+[RUST] call_transport_decode(func_ptr=0x18c4ea30, size=1032)
+[RUST]   calling transport_decode callback
+[RUST] get_data(context=0x57df3085d2e0, type=11, data=0x73860dffeadc, size=0x73860dffeae0)
+[RUST]   get base_hash=0x2
+[RUST] get_hash_size(algo=0x2)
+[RUST] get_hash_size(algo=0x2)
+[C_DEBUG] cert_chain_offset: hash_algo=0x2 hash_size=48 cert_chain_offset=52
+[C_DEBUG] cma_cache_cert: cache_offset=60 cache_len=972 portion=1024 remainder=567
+[RUST]   transport_decode ret=0, msg_size=1032
+[RUST]   AFTER call_transport_decode: ret=0
+[RUST]   CERTIFICATE response: portion=1024, remainder=567
+[RUST]   === CHUNK 1 COMPLETE: portion=1024, remainder=567, total_offset=0 ===
+[RUST]   total_cert_length=1591
+[RUST]   DEBUG: loop iteration 2 start
+[RUST] call_acquire_sender(func=0x18c4dcc0)
+[RUST]   acquire_sender ret=0, buf=0x308532e0
+[RUST]   === CHUNK 2 START: offset=1024, request_len=567 ===
+[RUST]   sending GET_CERTIFICATE: offset=1024, length=567
+[RUST] call_send(func=0x18c4e490, buf=0x308532e0, size=8)
+[C_DEBUG] SEND_YIELD: flags=0x6 RSP_CACHE=1 REQ_SEND=1 protocol=0 is_sspdm=0
+[RUST]   send ret=0, context=0x3085d2e0
+[RUST] call_acquire_receiver(func=0x18c4ecd0)
+[RUST-ACQ-RECV] func=0x57df18c4ecd0 context=0x57df3085d2e0
+[RUST-ACQ-RECV] ret=0 buf=0x57df308532e0
+[RUST]   acquire_receiver ret=0, buf=0x308532e0
+[RUST] call_recv(func=0x18c4e5d0)
+[C_RECV] ENTRY: resp_len=576 status=1 response=0x57df308532e0 send_recv_buf=0x57df308532e0
+[C_RECV] BEFORE_SERVICE_CALL: buf_offset=0 resp_addr=0x5da7a5f81000 resp_len_align=576
+[C_RECV] AFTER_SERVICE_CALL: rc=0
+[RUST]   recv ret=0, size=576
+[RUST] call_release_sender(func=0x18c4dce0, buf=0x308532e0)
+[RUST]   BEFORE call_transport_decode for CERTIFICATE chunk 2
+[RUST] call_transport_decode(func_ptr=0x18c4ea30, size=576)
+[RUST]   calling transport_decode callback
+[C_DEBUG] cma_cache_cert: cache_offset=8 cache_len=567 portion=567 remainder=0
+[RUST]   transport_decode ret=0, msg_size=576
+[RUST]   AFTER call_transport_decode: ret=0
+[RUST]   CERTIFICATE response: portion=567, remainder=0
+[RUST]   === CHUNK 2 COMPLETE: portion=567, remainder=0, total_offset=1024 ===
+[RUST]   === LOOP END: total_chunks=2, total_size=1591 ===
+[RUST]   get_certificate SUCCESS: total_size=1591
+[RUST] get_hash_size(algo=0x2)
+[RUST]   computed cert_chain_hash (full chain): len=48
+[RUST] set_data(context=0x57df3085d2e0, type=60, data=0x57df3085f8ac, size=48)
+[RUST]   set PEER_USED_CERT_CHAIN_HASH (size=48)
+[RUST]   stored cert_chain_hash (48 bytes)
+[RUST] set_data(context=0x57df3085d2e0, type=61, data=0x73860dffebb0, size=8)
+[RUST]   unknown data_type=61
+[EL0_APP] func_id=11 session_id=0x0
+ 03 69 00 30 66 02 31 
+0390: 00 99 03 64 47 66 6c 30 6a b7 9d d3 5a 99 21 68 
+03a0: ae 09 50 6f eb b4 fd ef 69 0b cf b2 56 4f b6 8f 
+03b0: 1f 43 11 0c de f6 fd 77 fd a9 34 25 81 7e 97 64 
+03c0: 4c 02 31 00 f9 c7 5c 54 3d 43 92 9a 30 3d 61 1a 
+03d0: 1e f8 65 51 d4 d5 20 90 d2 85 f0 44 de 40 85 ea 
+03e0: 34 61 dd 6b fe 60 bd 0a c0 db 3d 43 2c ad d4 c4 
+03f0: e9 fa 22 33 30 82 02 47 30 82 01 cc a0 03 02 01 
+0400: 02 02 01 03 30 0a 06 08 
+SMC_RMI_PDEV_GET_STATE            5da7a5f7d000 > RMI_SUCCESS 0
+SMC_RMI_PDEV_COMMUNICATE          5da7a5f7d000 5da7a5f7f000 > RMI_SUCCESS
+[HOST_DEBUG] cache_dev_req_resp: flags=0x6 REQ_CACHE=0 RSP_CACHE=1 obj_id=1 rsp_offset=60 rsp_len=972
+[HOST_DEBUG] pdev_cache_object: obj_id=1 buf_len=972 cert_chain_len=0
+host_pdev_cache_device_object: cache_cert: offset: 0x0, len: 0x3cc
+[SPDM TX] DOE header: vendor_id=0x1, type=1, len=4
+[SPDM TX] Request data: len=8 bytes
+0000: 12 82 00 00 00 04 37 02 
+[SPDM RX] DOE header: vendor_id=0x1, type=1, len=146
+[SPDM RX] Response data: len=576 bytes
+0000: 12 02 00 00 37 02 00 00 2a 86 48 ce 3d 04 03 03 
+0010: 30 30 31 2e 30 2c 06 03 55 04 03 0c 25 44 4d 54 
+0020: 46 20 6c 69 62 73 70 64 6d 20 45 43 50 33 38 34 
+0030: 20 69 6e 74 65 72 6d 65 64 69 61 74 65 20 63 65 
+0040: 72 74 30 1e 17 0d 32 33 30 39 31 32 30 37 31 31 
+0050: 33 33 5a 17 0d 33 33 30 39 30 39 30 37 31 31 33 
+0060: 33 5a 30 2d 31 2b 30 29 06 03 55 04 03 0c 22 44 
+0070: 4d 54 46 20 6c 69 62 73 70 64 6d 20 45 43 50 33 
+0080: 38 34 20 72 65 73 70 6f 6e 64 65 72 20 63 65 72 
+0090: 74 30 76 30 10 06 07 2a 86 48 ce 3d 02 01 06 05 
+00a0: 2b 81 04 00 22 03 62 00 04 0d 1c b9 20 1c dc ed 
+00b0: c8 64 e9 70 a3 62 12 da d4 fe 59 94 ce bd ae d7 
+00c0: d2 94 e4 e3 11 88 78 b9 88 c0 ed 5b e1 41 4a df 
+00d0: 28 db 49 0f 38 81 52 68 b5 4c 6a 11 0b 58 b1 9c 
+00e0: c1 4d 47 41 14 1f 6d d6 57 ac a3 9f d1 b9 64 de 
+00f0: 07 11 e8 31 78 de 75 3a b7 2c 15 56 ea f5 20 63 
+0100: 93 0f 33 a9 71 a3 7e 78 19 a3 81 bc 30 81 b9 30 
+0110: 0c 06 03 55 1d 13 01 01 ff 04 02 30 00 30 0b 06 
+0120: 03 55 1d 0f 04 04 03 02 05 e0 30 1d 06 03 55 1d 
+0130: 0e 04 16 04 14 14 3c 4f 66 c7 d7 60 40 7f 67 c1 
+0140: 95 68 b3 87 28 3e c5 23 83 30 31 06 03 55 1d 11 
+0150: 04 2a 30 28 a0 26 06 0a 2b 06 01 04 01 83 1c 82 
+0160: 12 01 a0 18 0c 16 41 43 4d 45 3a 57 49 44 47 45 
+0170: 54 3a 31 32 33 34 35 36 37 38 39 30 30 2a 06 03 
+0180: 55 1d 25 01 01 ff 04 20 30 1e 06 08 2b 06 01 05 
+0190: 05 07 03 01 06 08 2b 06 01 05 05 07 03 02 06 08 
+01a0: 2b 06 01 05 05 07 03 09 30 1e 06 0a 2b 06 01 04 
+01b0: 01 83 1c 82 12 06 04 10 30 0e 30 0c 06 0a 2b 06 
+01c0: 01 04 01 83 1c 82 12 02 30 0a 06 08 2a 86 48 ce 
+01d0: 3d 04 03 03 03 69 00 30 66 02 31 00 af 75 02 a9 
+01e0: b3 a6 47 4a 6e f4 0c b0 85 07 fc 3c 53 9d 29 b0 
+01f0: 09 c2 b9 b3 f3 96 b9 99 be c5 75 9c ac 4f c3 8a 
+0200: 7a 24 7d 17 f7 cb 2a 71 14 57 3e 92 02 31 00 d3 
+0210: 57 af 94 68 e1 02 b6 51 50 0c 4a 74 97 72 37 b5 
+0220: 03 ff 58 80 e0 f5 eb ae 1e 81 d8 d5 84 3d 18 83 
+0230: 60 fe 07 cd 43 2d 27 bd f5 a4 a5 19 7f 5d 09 00 
+SMC_RMI_PDEV_GET_STATE            5da7a5f7d000 > RMI_SUCCESS 0
+SMC_RMI_PDEV_COMMUNICATE          5da7a5f7d000 5da7a5f7f000 > RMI_SUCCESS
+[HOST_DEBUG] cache_dev_req_resp: flags=0x2 REQ_CACHE=0 RSP_CACHE=1 obj_id=1 rsp_offset=8 rsp_len=567
+[HOST_DEBUG] pdev_cache_object: obj_id=1 buf_len=567 cert_chain_len=972
+host_pdev_cache_device_object: cache_cert: offset: 0x3cc, len: 0x237
+SMC_RMI_PDEV_GET_STATE            5da7a5f7d000 > RMI_SUCCESS 0
+SMC_RMI_PDEV_COMMUNICATE          5da7a5f7d000 5da7a5f7f000 > RMI_SUCCESS
+SMC_RMI_PDEV_GET_STATE            5da7a5f7d000 > RMI_SUCCESS 1
+SMC_RMI_PDEV_GET_STATE            5da7a5f7d000 > RMI_SUCCESS 1
+[HOST_DEBUG] BEFORE get_public_key: cert_chain_len=1539
+leaf_cert_len: 0x24b
+DEV public key len/sig_algo: 97/2
+SMC_RMI_PDEV_SET_PUBKEY           5da7a5f7d000 5da7a5f85000 > RMI_SUCCESS
+SMC_RMI_PDEV_GET_STATE            5da7a5f7d000 > RMI_SUCCESS 2
+SMC_RMI_PDEV_GET_STATE            5da7a5f7d000 > RMI_SUCCESS 2
+SMC_RMI_PDEV_COMMUNICATE          5da7a5f7d000 5da7a5f7f000 > RMI_SUCCESS
+[SPDM TX] DOE header: vendor_id=0x1, type=1, len=41
+[SPDM TX] Re[90m[SPDM-EMU] Platform port Transmit command: 00 00 00 01 [0m
+[90m[SPDM-EMU] Platform port Transmit transport_type: 00 00 00 02 [0m
+[90m[SPDM-EMU] Platform port Transmit size: 00 00 02 48 [0m
+[90m[SPDM-EMU] Platform port Transmit buffer:[0m
+[90m[SPDM-EMU]     01 00 01 00 92 00 00 00 12 02 00 00 37 02 00 00 2a 86 48 ce 3d 04 03 03 30 30 31 2e 30 2c 06 03 55 04 03 0c 25 44 4d 54 46 20 6c 69 62 73 70 64 6d 20 45 43 50 33 38 34 20 69 6e 74 65 72 6d 65 64 69 61 74 65 20 63 65 72 74 30 1e 17 0d 32 33 30 39 31 32 30 37 31 31 33 33 5a 17 0d 33 33 30 39 30 39 30 37 31 31 33 33 5a 30 2d 31 2b 30 29 06 03 55 04 03 0c 22 44 4d 54 46 20 6c 69 62 73 70 64 6d 20 45 43 50 33 38 34 20 72 65 73 70 6f 6e 64 65 72 20 63 65 72 74 30 76 30 10 06 07 2a 86 48 ce 3d 02 01 06 05 2b 81 04 00 22 03 62 00 04 0d 1c b9 20 1c dc ed c8 64 e9 70 a3 62 12 da d4 fe 59 94 ce bd ae d7 d2 94 e4 e3 11 88 78 b9 88 c0 ed 5b e1 41 4a df 28 db 49 0f 38 81 52 68 b5 4c 6a 11 0b 58 b1 9c c1 4d 47 41 14 1f 6d d6 57 ac a3 9f d1 b9 64 de 07 11 e8 31 78 de 75 3a b7 2c 15 56 ea f5 20 63 93 0f 33 a9 71 a3 7e 78 19 a3 81 bc 30 81 b9 30 0c 06 03 55 1d 13 01 01 ff 04 02 30 00 30 0b 06 03 55 1d 0f 04 04 03 02 05 e0 30 1d 06 03 55 1d 0e 04 16 04 14 14 3c 4f 66 c7 d7 60 40 7f 67 c1 95 68 b3 87 28 3e c5 23 83 30 31 06 03 55 1d 11 04 2a 30 28 a0 26 06 0a 2b 06 01 04 01 83 1c 82 12 01 a0 18 0c 16 41 43 4d 45 3a 57 49 44 47 45 54 3a 31 32 33 34 35 36 37 38 39 30 30 2a 06 03 55 1d 25 01 01 ff 04 20 30 1e 06 08 2b 06 01 05 05 07 03 01 06 08 2b 06 01 05 05 07 03 02 06 08 2b 06 01 05 05 07 03 09 30 1e 06 0a 2b 06 01 04 01 83 1c 82 12 06 04 10 30 0e 30 0c 06 0a 2b 06 01 04 01 83 1c 82 12 02 30 0a 06 08 2a 86 48 ce 3d 04 03 03 03 69 00 30 66 02 31 00 af 75 02 a9 b3 a6 47 4a 6e f4 0c b0 85 07 fc 3c 53 9d 29 b0 09 c2 b9 b3 f3 96 b9 99 be c5 75 9c ac 4f c3 8a 7a 24 7d 17 f7 cb 2a 71 14 57 3e 92 02 31 00 d3 57 af 94 68 e1 02 b6 51 50 0c 4a 74 97 72 37 b5 03 ff 58 80 e0 f5 eb ae 1e 81 d8 d5 84 3d 18 83 60 fe 07 cd 43 2d 27 bd f5 a4 a5 19 7f 5d 09 00 [0m
+[90m[SPDM-EMU] Platform port Receive command: 00 00 00 01 [0m
+[90m[SPDM-EMU] Platform port Receive transport_type: 00 00 00 02 [0m
+[90m[SPDM-EMU] Platform port Receive size: 00 00 00 a4 [0m
+[90m[SPDM-EMU] Platform port Receive buffer:[0m
+[90m[SPDM-EMU]     01 00 01 00 29 00 00 00 12 e4 00 00 ff ff 00 00 38 0b 56 e0 5d 30 71 ff 66 77 b5 3e 98 13 cf a2 64 fa 3f 6e a1 df 0e 9e f2 7b 0d 19 c2 c8 1f c1 02 fe a9 b0 fe 53 b4 4d e9 46 fd a5 21 87 c9 e4 2b a2 71 ee 59 3b 32 fa a9 4b 4d 79 96 ba 5d ba ec 84 10 2e ba 6c fe c4 0c 57 14 8b 75 92 d2 87 c4 28 43 04 31 92 e8 20 ed 7d b9 e5 36 f8 4f 2a b5 11 f9 83 ba fd b1 2f 88 c8 a1 7c 2a 4e fe 68 9f c9 36 1f dc af d3 ec 4e 68 7f 7d 25 24 f2 14 10 00 01 00 00 00 00 00 05 00 01 01 01 00 11 00 00 00 00 00 [0m
+[90m[SPDM-EMU] SpdmReceiveRequest[.] ...[0m
+[90m[SPDM-EMU] SpdmReceiveRequest[0] msg SPDM_KEY_EXCHANGE(0xe4), size (0x9c): [0m
+[90m[SPDM-EMU] 0000: 12 e4 00 00 ff ff 00 00 38 0b 56 e0 5d 30 71 ff 66 77 b5 3e 98 13 cf a2 64 fa 3f 6e a1 df 0e 9e [0m
+[90m[SPDM-EMU] 0020: f2 7b 0d 19 c2 c8 1f c1 02 fe a9 b0 fe 53 b4 4d e9 46 fd a5 21 87 c9 e4 2b a2 71 ee 59 3b 32 fa [0m
+[90m[SPDM-EMU] 0040: a9 4b 4d 79 96 ba 5d ba ec 84 10 2e ba 6c fe c4 0c 57 14 8b 75 92 d2 87 c4 28 43 04 31 92 e8 20 [0m
+[90m[SPDM-EMU] 0060: ed 7d b9 e5 36 f8 4f 2a b5 11 f9 83 ba fd b1 2f 88 c8 a1 7c 2a 4e fe 68 9f c9 36 1f dc af d3 ec [0m
+[90m[SPDM-EMU] 0080: 4e 68 7f 7d 25 24 f2 14 10 00 01 00 00 00 00 00 05 00 01 01 01 00 11 00 00 00 00 00 [0m
+[90m[SPDM-EMU] SpdmSendResponse[0] ...[0m
+[90m[SPDM-EMU] Calc SelfKey (0x60):[0m
+[90m[SPDM-EMU] 0000: 8c 99 5a 8c 24 04 8d c9 f6 c6 89 fe d1 56 ad a7 f3 c5 d7 65 ce a1 91 4a a1 f2 fb ef 78 7e 4a 80 [0m
+[90m[SPDM-EMU] 0020: 20 ea 11 88 0a 6f 9c cc d2 77 24 f9 05 f0 35 5d 26 2c 8f c3 07 49 5b 35 74 3b 62 0b aa f0 35 fa [0m
+[90m[SPDM-EMU] 0040: fd aa 68 ed ac 0f f3 a8 80 ea 3e 2d 72 42 24 86 90 87 c4 f9 d6 a3 3d be 79 56 28 ad bc 37 b0 fa [0m
+[90m[SPDM-EMU] Calc peer_key (0x60):[0m
+[90m[SPDM-EMU] 0000: 02 fe a9 b0 fe 53 b4 4d e9 46 fd a5 21 87 c9 e4 2b a2 71 ee 59 3b 32 fa a9 4b 4d 79 96 ba 5d ba [0m
+[90m[SPDM-EMU] 0020: ec 84 10 2e ba 6c fe c4 0c 57 14 8b 75 92 d2 87 c4 28 43 04 31 92 e8 20 ed 7d b9 e5 36 f8 4f 2a [0m
+[90m[SPDM-EMU] 0040: b5 11 f9 83 ba fd b1 2f 88 c8 a1 7c 2a 4e fe 68 9f c9 36 1f dc af d3 ec 4e 68 7f 7d 25 24 f2 14 [0m
+[90m[SPDM-EMU] th_curr hash - 9f 27 05 ad 9e 85 f6 56 ff 66 55 26 f2 8b 5a 55 2c 58 72 0b f9 4a df 39 0c a2 59 99 42 70 df 88 62 06 0d e5 e6 cc 93 42 d3 cd 5c 19 24 a6 d7 70 [0m
+[90m[SPDM-EMU] signature - 48 a2 dc b0 69 6a 4e bc 89 9e 24 92 d3 fc 1f e7 76 98 ff 12 9b 45 8f b2 6c fe ab 0c a6 c5 fe b1 5d d5 b0 20 d3 d4 fa 37 5c e1 8d 90 b5 f0 8e 7d 24 e2 fe 10 ba 60 87 13 13 30 fe dc 3f 3b 7b 05 f9 1b 68 0a 54 a9 ef 72 43 eb 82 8e 2d e2 45 a1 b5 a8 10 e3 e8 83 03 5b 8a 4c b2 4c cd 06 44 88 [0m
+[90m[SPDM-EMU] libspdm_generate_session_handshake_key[ffffffff][0m
+[90m[SPDM-EMU] Calc th1 hash ...[0m
+[90m[SPDM-EMU] th1 hash - 49 2e 1a 61 b5 4b 6e 84 b6 74 fc 99 7d bb c5 3d 2c a3 bb f8 92 e4 a8 9b ed 3c de b1 5e 54 14 42 eb 74 cf 80 aa 3d 63 21 6a ee 5f 1a 28 ee 86 6d [0m
+[90m[SPDM-EMU] [DHE Secret]: 4caa368839c9922c746bc2ac134a06c070ebda93756919a7d8502d101daad9067fed69ab8151d4c339ef5a91b71ae5dc[0m
+[90m[SPDM-EMU] handshake_secret (0x30) - db bd a1 27 e5 31 e9 a7 d4 63 30 3f 2c 33 f1 68 5c f7 01 21 f9 99 f8 6d d6 fd 03 6a 0a 16 ce 91 93 79 2c e2 10 df ef 8b 9b f0 c1 7d 6b 24 02 7f [0m
+[90m[SPDM-EMU] bin_str1 (0x45):[0m
+[90m[SPDM-EMU] 0000: 30 00 73 70 64 6d 31 2e 32 20 72 65 71 20 68 73 20 64 61 74 61 49 2e 1a 61 b5 4b 6e 84 b6 74 fc [0m
+[90m[SPDM-EMU] 0020: 99 7d bb c5 3d 2c a3 bb f8 92 e4 a8 9b ed 3c de b1 5e 54 14 42 eb 74 cf 80 aa 3d 63 21 6a ee 5f [0m
+[90m[SPDM-EMU] 0040: 1a 28 ee 86 6d [0m
+[90m[SPDM-EMU] request_handshake_secret (0x30) - 26 95 38 ec ff e8 b5 6f b3 bf 5b 60 6f c6 21 91 25 c3 35 71 bc 89 e7 b1 0e a8 6d 01 86 8d 3f eb c5 47 83 ec a1 6a f0 cd e0 48 7f 76 65 02 1c c0 [0m
+[90m[SPDM-EMU] bin_str2 (0x45):[0m
+[90m[SPDM-EMU] 0000: 30 00 73 70 64 6d 31 2e 32 20 72 73 70 20 68 73 20 64 61 74 61 49 2e 1a 61 b5 4b 6e 84 b6 74 fc [0m
+[90m[SPDM-EMU] 0020: 99 7d bb c5 3d 2c a3 bb f8 92 e4 a8 9b ed 3c de b1 5e 54 14 42 eb 74 cf 80 aa 3d 63 21 6a ee 5f [0m
+[90m[SPDM-EMU] 0040: 1a 28 ee 86 6d [0m
+[90m[SPDM-EMU] response_handshake_secret (0x30) - 44 9e 2e 00 02 11 3a 67 3e 9e 94 8e 32 fd 8b 44 4d 9a 90 dd 18 cc 5c 26 26 1b 0d 41 8a a0 57 f3 93 36 aa 2a 67 0f 77 25 53 dd f7 9c 07 cb 94 c4 [0m
+[90m[SPDM-EMU] bin_str7 (0x12):[0m
+[90m[SPDM-EMU] 0000: 30 00 73 70 64 6d 31 2e 32 20 66 69 6e 69 73 68 65 64 [0m
+[90m[SPDM-EMU] finished_key (0x30) - e6 d1 13 68 92 cc c5 d3 48 15 4d a2 05 fc 6d b8 61 3f 2c 88 df 0a 74 03 24 1a 56 20 0b 54 b8 c3 e8 49 94 0d e4 85 8e e3 8b 5a fe f9 c6 03 7f 73 [0m
+[90m[SPDM-EMU] bin_str7 (0x12):[0m
+[90m[SPDM-EMU] 0000: 30 00 73 70 64 6d 31 2e 32 20 66 69 6e 69 73 68 65 64 [0m
+[90m[SPDM-EMU] finished_key (0x30) - 64 8e da 39 07 6c 87 6d 92 92 f9 0f 62 ac 25 e4 62 5c 62 e5 87 06 09 d3 49 3a 16 31 2a a0 61 ec a0 cc 27 ee fa 10 b6 e3 fe 64 f0 d2 d5 a2 b6 d5 [0m
+[90m[SPDM-EMU] bin_str5 (0xd):[0m
+[90m[SPDM-EMU] 0000: 20 00 73 70 64 6d 31 2e 32 20 6b 65 79 [0m
+[90m[SPDM-EMU] key (0x20) - ad 8f 8a 18 e8 f2 53 7d 5e df 71 98 10 19 a8 6c 77 84 ae a0 b8 e2 b9 83 ae 0e 59 c7 70 52 10 3a [0m
+[90m[SPDM-EMU] bin_str6 (0xc):[0m
+[90m[SPDM-EMU] 0000: 0c 00 73 70 64 6d 31 2e 32 20 69 76 [0m
+[90m[SPDM-EMU] iv (0xc) - 57 a9 23 83 05 79 fd 13 ab c0 0c 3b [0m
+[90m[SPDM-EMU] bin_str5 (0xd):[0m
+[90m[SPDM-EMU] 0000: 20 00 73 70 64 6d 31 2e 32 20 6b 65 79 [0m
+[90m[SPDM-EMU] key (0x20) - 66 bc 0e 00 6a 57 f0 60 25 7c 0f 4f c2 6d b5 e1 7e 85 dc 0b 78 03 da ae 5a cd d9 aa e0 65 0d d6 [0m
+[90m[SPDM-EMU] bin_str6 (0xc):[0m
+[90m[SPDM-EMU] 0000: 0c 00 73 70 64 6d 31 2e 32 20 69 76 [0m
+[90m[SPDM-EMU] iv (0xc) - 5a f3 4e e9 11 38 f9 b6 c9 5e 35 39 [0m
+[90m[SPDM-EMU] session policy - 0[0m
+[90m[SPDM-EMU] SpdmSendResponse[0]: msg SPDM_KEY_EXCHANGE_RSP(0x64), size (0xf6): [0m
+[90m[SPDM-EMU] 0000: 12 64 00 00 ff ff 00 00 3c 17 62 ac 50 bd 69 9b 56 fc 88 a1 dd 55 ca 36 8f be 3a 8d fb 63 06 2a [0m
+[90m[SPDM-EMU] 0020: 7a 78 26 20 a8 7c 99 c5 8c 99 5a 8c 24 04 8d c9 f6 c6 89 fe d1 56 ad a7 f3 c5 d7 65 ce a1 91 4a [0m
+[90m[SPDM-EMU] 0040: a1 f2 fb ef 78 7e 4a 80 20 ea 11 88 0a 6f 9c cc d2 77 24 f9 05 f0 35 5d 26 2c 8f c3 07 49 5b 35 [0m
+[90m[SPDM-EMU] 0060: 74 3b 62 0b aa f0 35 fa fd aa 68 ed ac 0f f3 a8 80 ea 3e 2d 72 42 24 86 90 87 c4 f9 d6 a3 3d be [0m
+[90m[SPDM-EMU] 0080: 79 56 28 ad bc 37 b0 fa 0c 00 01 00 00 00 00 00 04 00 01 00 00 11 48 a2 dc b0 69 6a 4e bc 89 9e [0m
+[90m[SPDM-EMU] 00a0: 24 92 d3 fc 1f e7 76 98 ff 12 9b 45 8f b2 6c fe ab 0c a6 c5 fe b1 5d d5 b0 20 d3 d4 fa 37 5c e1 [0m
+[90m[SPDM-EMU] 00c0: 8d 90 b5 f0 8e 7d 24 e2 fe 10 ba 60 87 13 13 30 fe dc 3f 3b 7b 05 f9 1b 68 0a 54 a9 ef 72 43 eb [0m
+[90m[SPDM-EMU] 00e0: 82 8e 2d e2 45 a1 b5 a8 10 e3 e8 83 03 5b 8a 4c b2 4c cd 06 44 88 [0m
+[90m[SPDM-EMU] Platform port Transmit command: 00 00 00 01 [0m
+[90m[SPDM-EMU] Platform port Transmit transport_type: 00 00 00 02 [0m
+[90m[SPDM-EMU] Platform port Transmit size: 00 00 01 00 [0m
+[90m[SPDM-EMU] Platform port Transmit buffer:[0m
+[RUST] start_session(context=0x3085d2e0, use_psk=0, slot=0)
+[RUST] key_exchange(context=0x3085d2e0, slot=0)
+[RUST]   dhe_group=0x30018, key_size=96 (X+Y coordinates, no prefix)
+[RUST]   ECDH pubkey generated: size=96
+[RUST]   KEY_EXCHANGE size: header=4, session_id=2, policy=1, reserved=1, random=32, dhe=96, opaque_len=2, opaque=16 = total 154
+[RUST] call_acquire_sender(func=0x18c4dcc0)
+[RUST]   acquire_sender ret=0, buf=0x308532e0
+[RUST]   sender_buf=0x308532e0
+[RUST]   KEY_EXCHANGE header: 12 e4 00 00
+[RUST]   KEY_EXCHANGE session: ff ff
+[RUST]   KEY_EXCHANGE opaque_len: 10 00
+[RUST]   KEY_EXCHANGE opaque[0-4]: 01 00 00 00 00
+[RUST]   KEY_EXCHANGE opaque[5-9]: 00 05 00 01 01
+[RUST]   KEY_EXCHANGE opaque[10-14]: 01 00 11 00 00
+[RUST]   KEY_EXCHANGE opaque[15]: 00
+[RUST] call_send(func=0x18c4e490, buf=0x308532e0, size=154)
+[C_DEBUG] SEND_YIELD: flags=0x4 RSP_CACHE=0 REQ_SEND=1 protocol=0 is_sspdm=0
+[RUST]   send ret=0, context=0x3085d2e0
+[RUST]   saved KEY_EXCHANGE request: len=154
+[RUST] call_release_sender(func=0x18c4dce0, buf=0x308532e0)
+[RUST] call_acquire_receiver(func=0x18c4ecd0)
+[RUST-ACQ-RECV] func=0x57df18c4ecd0 context=0x57df3085d2e0
+[RUST-ACQ-RECV] ret=0 buf=0x57df308532e0
+[RUST]   acquire_receiver ret=0, buf=0x308532e0
+[RUST] call_recv(func=0x18c4e5d0)
+[C_RECV] ENTRY: resp_len=248 status=1 response=0x57df308532e0 send_recv_buf=0x57df308532e0
+[C_RECV] BEFORE_SERVICE_CALL: buf_offset=0 resp_addr=0x5da7a5f81000 resp_len_align=248
+[C_RECV] AFTER_SERVICE_CALL: rc=0
+[90m[SPDM-EMU]     01 00 01 00 40 00 00 00 12 64 00 00 ff ff 00 00 3c 17 62 ac 50 bd 69 9b 56 fc 88 a1 dd 55 ca 36 8f be 3a 8d fb 63 06 2a 7a 78 26 20 a8 7c 99 c5 8c 99 5a 8c 24 04 8d c9 f6 c6 89 fe d1 56 ad a7 f3 c5 d7 65 ce a1 91 4a a1 f2 fb ef 78 7e 4a 80 20 ea 11 88 0a 6f 9c cc d2 77 24 f9 05 f0 35 5d 26 2c 8f c3 07 49 5b 35 74 3b 62 0b aa f0 35 fa fd aa 68 ed ac 0f f3 a8 80 ea 3e 2d 72 42 24 86 90 87 c4 f9 d6 a3 3d be 79 56 28 ad bc 37 b0 fa 0c 00 01 00 00 00 00 00 04 00 01 00 00 11 48 a2 dc b0 69 6a 4e bc 89 9e 24 92 d3 fc 1f e7 76 98 ff 12 9b 45 8f b2 6c fe ab 0c a6 c5 fe b1 5d d5 b0 20 d3 d4 fa 37 5c e1 8d 90 b5 f0 8e 7d 24 e2 fe 10 ba 60 87 13 13 30 fe dc 3f 3b 7b 05 f9 1b 68 0a 54 a9 ef 72 43 eb 82 8e 2d e2 45 a1 b5 a8 10 e3 e8 83 03 5b 8a 4c b2 4c cd 06 44 88 00 00 [0m
+[90m[SPDM-EMU] Platform port Receive command: 00 00 00 01 [0m
+[90m[SPDM-EMU] Platform port Receive transport_type: 00 00 00 02 [0m
+[90m[SPDM-EMU] Platform port Receive size: 00 00 00 3c [0m
+[90m[SPDM-EMU] Platform port Receive buffer:[0m
+[90m[SPDM-EMU]     01 00 01 00 0f 00 00 00 12 e5 00 00 2f c0 90 56 2a 77 b5 e6 ef 08 fa 82 13 40 4f 80 92 b6 ca e7 44 66 49 e2 47 9c 03 70 2e ec 77 b0 12 b8 3d 26 8c 1b 31 df 6d ce 2a 16 b2 08 2c 6c [0m
+[90m[SPDM-EMU] SpdmReceiveRequest[.] ...[0m
+[90m[SPDM-EMU] SpdmReceiveRequest[0] msg SPDM_FINISH(0xe5), size (0x34): [0m
+[90m[SPDM-EMU] 0000: 12 e5 00 00 2f c0 90 56 2a 77 b5 e6 ef 08 fa 82 13 40 4f 80 92 b6 ca e7 44 66 49 e2 47 9c 03 70 [0m
+[90m[SPDM-EMU] 0020: 2e ec 77 b0 12 b8 3d 26 8c 1b 31 df 6d ce 2a 16 b2 08 2c 6c [0m
+[90m[SPDM-EMU] SpdmSendResponse[0] ...[0m
+[90m[SPDM-EMU] th_curr hmac - 2f c0 90 56 2a 77 b5 e6 ef 08 fa 82 13 40 4f 80 92 b6 ca e7 44 66 49 e2 47 9c 03 70 2e ec 77 b0 12 b8 3d 26 8c 1b 31 df 6d ce 2a 16 b2 08 2c 6c [0m
+[90m[SPDM-EMU] !!! verify_finish_req_hmac - PASS !!![0m
+[90m[SPDM-EMU] th_curr hmac - 94 e9 40 07 e9 a7 48 4c 24 86 f0 7e 12 e2 d9 8e 2a 90 19 48 32 23 6a cc 9f d1 f0 f1 e9 22 b6 04 b1 6c d7 c8 e0 73 2c 6a 22 35 79 de f0 88 e4 28 [0m
+[90m[SPDM-EMU] libspdm_generate_session_data_key[ffffffff][0m
+[90m[SPDM-EMU] Calc th2 hash ...[0m
+[90m[SPDM-EMU] th2 hash - d6 c4 96 dc b7 7f 7e d8 df 7b d8 44 75 bb 09 9f 78 ea 39 75 8b 9f 44 e1 2d 7e ea 41 fe de d5 3e 0f 4c d1 a0 6b 93 84 94 89 52 e4 6b d8 71 1f d5 [0m
+[90m[SPDM-EMU] bin_str0 (0x11):[0m
+[90m[SPDM-EMU] 0000: 30 00 73 70 64 6d 31 2e 32 20 64 65 72 69 76 65 64 [0m
+[90m[SPDM-EMU] salt1 (0x30) - 70 11 50 2a 90 cc 86 66 2d 32 de e5 83 0a 55 86 8a bf 03 62 54 3b be 21 cf 98 e5 35 72 8a cd 44 50 fa ef 6e ea bb b4 db 01 4c 53 8f 3f c1 52 59 [0m
+[90m[SPDM-EMU] master_secret (0x30) - 29 a2 21 57 2d 3a d4 38 4b 3e 35 6b 4a a8 14 87 06 e7 19 31 dc 8d 05 3d 3e ee 21 ba 6e 97 df e1 29 cc 8f ca a4 a5 cd 9d 74 0f 8e 96 66 24 a6 cd [0m
+[90m[SPDM-EMU] bin_str3 (0x46):[0m
+[90m[SPDM-EMU] 0000: 30 00 73 70 64 6d 31 2e 32 20 72 65 71 20 61 70 70 20 64 61 74 61 d6 c4 96 dc b7 7f 7e d8 df 7b [0m
+[90m[SPDM-EMU] 0020: d8 44 75 bb 09 9f 78 ea 39 75 8b 9f 44 e1 2d 7e ea 41 fe de d5 3e 0f 4c d1 a0 6b 93 84 94 89 52 [0m
+[90m[SPDM-EMU] 0040: e4 6b d8 71 1f d5 [0m
+[90m[SPDM-EMU] request_data_secret (0x30) - 3f eb 2c 28 35 2b 5f 53 61 73 37 d9 74 6f e6 d0 e0 c5 21 71 66 ff a1 8a 76 12 07 cb d4 71 3e c4 9e 80 bf a0 66 71 25 f4 a0 68 9f cf 52 9e e7 ed [0m
+[90m[SPDM-EMU] bin_str4 (0x46):[0m
+[90m[SPDM-EMU] 0000: 30 00 73 70 64 6d 31 2e 32 20 72 73 70 20 61 70 70 20 64 61 74 61 d6 c4 96 dc b7 7f 7e d8 df 7b [0m
+[90m[SPDM-EMU] 0020: d8 44 75 bb 09 9f 78 ea 39 75 8b 9f 44 e1 2d 7e ea 41 fe de d5 3e 0f 4c d1 a0 6b 93 84 94 89 52 [0m
+[90m[SPDM-EMU] 0040: e4 6b d8 71 1f d5 [0m
+[90m[SPDM-EMU] response_data_secret (0x30) - be 29 9b b5 f9 d4 56 09 40 0f 07 b2 cd ae 6c f0 67 2d 27 8d 9e 6d 3d 72 23 56 ef ea a4 99 dd 56 9b dd 33 e0 29 be 87 94 ff 72 7f c8 58 b1 dd 1f [0m
+[90m[SPDM-EMU] bin_str8 (0x44):[0m
+[90m[SPDM-EMU] 0000: 30 00 73 70 64 6d 31 2e 32 20 65 78 70 20 6d 61 73 74 65 72 d6 c4 96 dc b7 7f 7e d8 df 7b d8 44 [0m
+[90m[SPDM-EMU] 0020: 75 bb 09 9f 78 ea 39 75 8b 9f 44 e1 2d 7e ea 41 fe de d5 3e 0f 4c d1 a0 6b 93 84 94 89 52 e4 6b [0m
+[90m[SPDM-EMU] 0040: d8 71 1f d5 [0m
+[90m[SPDM-EMU] export_master_secret (0x30) - 67 b4 43 8a f6 c4 5a 81 09 f9 83 89 a2 8f 06 c7 0f df c3 72 76 a3 40 ac d9 f3 ff 05 4d b5 08 24 22 59 43 73 ff 9e a7 85 7e 25 45 2f 1c 33 86 a7 [0m
+[90m[SPDM-EMU] bin_str5 (0xd):[0m
+[90m[SPDM-EMU] 0000: 20 00 73 70 64 6d 31 2e 32 20 6b 65 79 [0m
+[90m[SPDM-EMU] key (0x20) - 82 2a 46 e9 ab a5 58 b7 cb 4c a1 fe 92 52 54 28 ca 94 a1 f4 1c 76 cd 56 f5 7a 75 c1 09 e8 f5 eb [0m
+[90m[SPDM-EMU] bin_str6 (0xc):[0m
+[90m[SPDM-EMU] 0000: 0c 00 73 70 64 6d 31 2e 32 20 69 76 [0m
+[90m[SPDM-EMU] iv (0xc) - 25 fb 34 69 e7 8a 02 df 31 57 45 3c [0m
+[90m[SPDM-EMU] bin_str5 (0xd):[0m
+[90m[SPDM-EMU] 0000: 20 00 73 70 64 6d 31 2e 32 20 6b 65 79 [0m
+[90m[SPDM-EMU] key (0x20) - ac cc 65 fe f8 fa af f9 06 41 29 05 9d 6c 74 ea bd 79 af 31 a3 d1 57 b7 33 de 55 b8 5c 1a 83 07 [0m
+[90m[SPDM-EMU] bin_str6 (0xc):[0m
+[90m[SPDM-EMU] 0000: 0c 00 73 70 64 6d 31 2e 32 20 69 76 [0m
+[90m[SPDM-EMU] iv (0xc) - bc ad 33 07 eb cf a1 6f 77 55 ae 6e [0m
+[90m[SPDM-EMU] SpdmSendResponse[0]: msg SPDM_FINISH_RSP(0x65), size (0x34): [0m
+[90m[SPDM-EMU] 0000: 12 65 00 00 94 e9 40 07 e9 a7 48 4c 24 86 f0 7e 12 e2 d9 8e 2a 90 19 48 32 23 6a cc 9f d1 f0 f1 [0m
+[90m[SPDM-EMU] 0020: e9 22 b6 04 b1 6c d7 c8 e0 73 2c 6a 22 35 79 de f0 88 e4 28 [0m
+[90m[SPDM-EMU] Platform port Transmit command: 00 00 00 01 [0m
+[90m[SPDM-EMU] Platform port Transmit transport_type: 00 00 00 02 [0m
+[RUST]   recv ret=0, size=248
+[RUST]   recv size=248 (raw transport data)
+[RUST] call_transport_decode(func_ptr=0x18c4ea30, size=248)
+[RUST]   calling transport_decode callback
+[RUST]   transport_decode ret=0, msg_size=248
+[RUST]   decoded SPDM message size=248
+[RUST]   rsp_session_id=0xffff
+[RUST]   final session_id=0xffffffff
+[RUST]   extracted responder_random and dhe_pubkey
+[RUST]   opaque_length=12
+[RUST]   actual SPDM message size: 246 (decoded=248, expected_with_hmac=294, expected_no_hmac=246)
+[RUST]   shared_secret len=48 first8=4caa3688
+[RUST]   saved KEY_EXCHANGE response: len=246 (actual SPDM size)
+[RUST]   handshake_secret computed len=48 first8=dbbda127
+[RUST]   stored handshake_secret
+[RUST]   TH1 transcript sizes: msg_a=158 cert_hash=48 ke_req=154 ke_rsp=246
+[RUST]   message_a first4=10840000
+[RUST]   cert_chain_hash first4=dc024e78
+[RUST]   ke_req first4=12e40000
+[RUST]   ke_rsp first4=12640000
+[RUST]   TH1 transcript: msg_a=158 + cert_hash=48 + ke_req=154 + ke_rsp(no_sig=150) + sig=96
+[RUST]   TH1 computed first8=492e1a61
+[RUST]   computed TH1: len=48
+[RUST]   bin_str1 len=69
+[RUST]   request_handshake_secret first8=269538ec
+[RUST]   stored request_handshake_secret
+[RUST]   stored request_finished_key
+[RUST]   stored request_handshake_encryption_key
+[RUST]   stored request_handshake_salt
+[RUST]   stored response_handshake_secret
+[RUST]   stored response_finished_key
+[RUST]   stored response_handshake_encryption_key
+[RUST]   stored response_handshake_salt
+[RUST]   stored responder HMAC (verify_data)
+[RUST]   session_state -> HANDSHAKING
+[RUST]   key_exchange SUCCESS: session_id=0xffffffff
+[RUST]   KEY_EXCHANGE success: session=0xffffffff
+[RUST] finish(context=0x3085d2e0, session=0xffffffff, slot=0, attr=0)
+[RUST] call_acquire_sender(func=0x18c4dcc0)
+[RUST]   acquire_sender ret=0, buf=0x308532e0
+[RUST]   appended message_a: len=158
+[RUST]   appended cert_chain_hash: len=48
+[RUST]   skipped responder HMAC: handshake_in_clear=1
+[RUST]   transcript_data total: msg_a=158 + cert_hash=48 + ke_req=154 + ke_rsp=246 + hmac=0 + finish_hdr=4
+[RUST]   computed TH_curr hash OK
+[RUST]   loaded request_finished_key
+[RUST]   computed verify_data: len=48
+[RUST]   saved FINISH request: len=52
+[RUST]   sending FINISH: size=52 (header=4 + hmac=48)
+[RUST] call_send(func=0x18c4e490, buf=0x308532e0, size=52)
+[C_DEBUG] SEND_YIELD: flags=0x4 RSP_CACHE=0 REQ_SEND=1 protocol=0 is_sspdm=0
+[RUST]   send ret=0, context=0x3085d2e0
+[RUST] call_release_sender(func=0x18c4dce0, buf=0x308532e0)
+[RUST] call_acquire_receiver(func=0x18c4ecd0)
+[RUST-ACQ-RECV] func=0x57df18c4ecd0 context=0x57df3085d2e0
+[RUST-ACQ-RECV] ret=0 buf=0x57df308532e0
+[RUST]   acquire_receiver ret=0, buf=0x308532e0
+[RUST] call_recv(func=0x18c4e5d0)
+[C_RECV] ENTRY: resp_len=52 status=1 response=0x57df308532e0 send_recv_buf=0x57df308532e0
+[C_RECV] BEFORE_SERVICE_CALL: buf_offset=0 resp_addr=0x5da7a5f81000 resp_len_align=56
+[C_RECV] AFTER_SERVICE_CALL: rc=0
+quest data: len=156 bytes
+0000: 12 e4 00 00 ff ff 00 00 38 0b 56 e0 5d 30 71 ff 
+0010: 66 77 b5 3e 98 13 cf a2 64 fa 3f 6e a1 df 0e 9e 
+0020: f2 7b 0d 19 c2 c8 1f c1 02 fe a9 b0 fe 53 b4 4d 
+0030: e9 46 fd a5 21 87 c9 e4 2b a2 71 ee 59 3b 32 fa 
+0040: a9 4b 4d 79 96 ba 5d ba ec 84 10 2e ba 6c fe c4 
+0050: 0c 57 14 8b 75 92 d2 87 c4 28 43 04 31 92 e8 20 
+0060: ed 7d b9 e5 36 f8 4f 2a b5 11 f9 83 ba fd b1 2f 
+0070: 88 c8 a1 7c 2a 4e fe 68 9f c9 36 1f dc af d3 ec 
+0080: 4e 68 7f 7d 25 24 f2 14 10 00 01 00 00 00 00 00 
+0090: 05 00 01 01 01 00 11 00 00 00 00 00 
+[SPDM RX] DOE header: vendor_id=0x1, type=1, len=64
+[SPDM RX] Response data: len=248 bytes
+0000: 12 64 00 00 ff ff 00 00 3c 17 62 ac 50 bd 69 9b 
+0010: 56 fc 88 a1 dd 55 ca 36 8f be 3a 8d fb 63 06 2a 
+0020: 7a 78 26 20 a8 7c 99 c5 8c 99 5a 8c 24 04 8d c9 
+0030: f6 c6 89 fe d1 56 ad a7 f3 c5 d7 65 ce a1 91 4a 
+0040: a1 f2 fb ef 78 7e 4a 80 20 ea 11 88 0a 6f 9c cc 
+0050: d2 77 24 f9 05 f0 35 5d 26 2c 8f c3 07 49 5b 35 
+0060: 74 3b 62 0b aa f0 35 fa fd aa 68 ed ac 0f f3 a8 
+0070: 80 ea 3e 2d 72 42 24 86 90 87 c4 f9 d6 a3 3d be 
+0080: 79 56 28 ad bc 37 b0 fa 0c 00 01 00 00 00 00 00 
+0090: 04 00 01 00 00 11 48 a2 dc b0 69 6a 4e bc 89 9e 
+00a0: 24 92 d3 fc 1f e7 76 98 ff 12 9b 45 8f b2 6c fe 
+00b0: ab 0c a6 c5 fe b1 5d d5 b0 20 d3 d4 fa 37 5c e1 
+00c0: 8d 90 b5 f0 8e 7d 24 e2 fe 10 ba 60 87 13 13 30 
+00d0: fe dc 3f 3b 7b 05 f9 1b 68 0a 54 a9 ef 72 43 eb 
+00e0: 82 8e 2d e2 45 a1 b5 a8 10 e3 e8 83 03 5b 8a 4c 
+00f0: b2 4c cd 06 44 88 00 00 
+SMC_RMI_PDEV_GET_STATE            5da7a5f7d000 > RMI_SUCCESS 2
+SMC_RMI_PDEV_COMMUNICATE          5da7a5f7d000 5da7a5f7f000 > RMI_SUCCESS
+[SPDM TX] DOE header: vendor_id=0x1, type=1, len=15
+[SPDM TX] Request data: len=52 bytes
+0000: 12 e5 00 00 2f c0 90 56 2a 77 b5 e6 ef 08 fa 82 
+0010: 13 40 4f 80 92 b6 ca e7 44 66 49 e2 47 9c 03 70 
+0020: 2e ec 77 b0 12 b8 3d 26 8c 1b 31 df 6d ce 2a 16 
+0030: b2 08 2c 6c 
+[SPDM RX] DOE header: vendor_id=0x1, type=1, len=15
+[SPDM RX] Response data: len=52 bytes
+0000: 12 65 00 00 94 e9 40 07 e9 a7 48 4c 24 86 f0 7e 
+0010: 12 e2 d9 8e 2a 90 19 48 32 23 6a cc 9f d1 f0 f1 
+0020: e9 22 b6 04 b1 6c d7 c8 e0 73 2c 6a 22 35 79 de 
+0030: f0 88 e4 28 
+SMC_RMI_PDEV_GET_STATE            5da7a5f7d000 > RMI_SUCCESS 2
+SMC_RMI_PDEV_COMMUNICATE          5da7a5f7d000 5da7a5f7f000 > RMI_SUCCESS
+SMC_RMI_PDEV_GET_STATE            5da7a5f7d000 > RMI_SUCCESS 3
+SMC_RMI_PDEV_GET_STATE            5da7a5f7d000 > RMI_SUCCESS 3
+[STAGE 2 DONE] host_pdev_id = 256
+[STAGE 3] host_realm_run_attest() - Attestation RSI tests
+###########################
+# Hello World from a Realm!
+###########################
+SMC_RSI_VERSION                   10000 > RSI_SUCCESS 10000 10001
+RSI Version is 0x10000 : 0x10001
+SMC_RSI_ATTEST_TOKEN_INIT         29427402 30132f26 6f90d810 4e0a54b1 585fd2b0 1e8b321e 580c1c47 9b3ae3b > RSI_SUCCESS 1000
+Upper bound of attestation token size: 0x1000
+SMC_RSI_ATTEST_TOKEN_CONTINUE     1000 0 100
+Realm Token Attestation creation is pre-empted by interrupt.
+SMC_RSI_ATTEST_TOKEN_CONTINUE     1000 0 100 > RSI_INCOMPLETE 100
+Realm Token Attestation creation is pre-empted by interrupt.
+SMC_RSI_ATTEST_TOKEN_CONTINUE     1000 100 100 > RSI_INCOMPLETE 100
+Realm Token Attestation creation is pre-empted by interrupt.
+SMC_RSI_ATTEST_TOKEN_CONTINUE     1000 200 100 > RSI_INCOMPLETE 100
+Realm Token Attestation creation is pre-empted by interrupt.
+SMC_RSI_ATTEST_TOKEN_CONTINUE     1000 300 100 > RSI_INCOMPLETE 100
+Realm Token Attestation creation is pre-empted by interrupt.
+SMC_RSI_ATTEST_TOKEN_CONTINUE     1000 400 100 > RSI_INCOMPLETE 100
+Realm Token Attestation creation is pre-empted by interrupt.
+SMC_RSI_ATTEST_TOKEN_CONTINUE     1000 500 100 > RSI_INCOMPLETE 100
+Realm Token Attestation creation is pre-empted by interrupt.
+SMC_RSI_ATTEST_TOKEN_CONTINUE     1000 600 100 > RSI_INCOMPLETE 100
+Realm Token Attestation creation is pre-empted by interrupt.
+SMC_RSI_ATTEST_TOKEN_CONTINUE     1000 700 100 > RSI_INCOMPLETE 100
+Realm Token Attestation creation is pre-empted by interrupt.
+SMC_RSI_ATTEST_TOKEN_CONTINUE     1000 800 100 > RSI_SUCC[RUST]   recv ret=0, size=52
+[RUST]   recv size=52
+[RUST]   saved FINISH response: len=52
+[RUST]   deriving application_secret keys...
+[RUST]   salt1 first bytes: 7011502a
+[RUST]   master_secret first bytes: 29a22157
+[RUST]   TH1 base: msg_a=158 cert=48 ke_req=154 ke_rsp(no_sig)=150 sig=96
+[RUST]   skipped responder HMAC for TH2: handshake_in_clear=1
+[RUST]   appended FINISH req header: 4 bytes
+[RUST]   appended FINISH req HMAC: 48 bytes
+[RUST]   appended FINISH rsp: 52 bytes (handshake_in_clear=1)
+[RUST]   TH2 transcript total: 710 bytes
+[RUST]   TH2 hash first bytes: d6c496dc
+[RUST]   request_data_secret first bytes: 3feb2c28
+[RUST]   stored request_data_encryption_key
+[RUST]   stored request_data_salt
+[RUST]   derived response_data_secret
+[RUST]   stored response_data_encryption_key
+[RUST]   stored response_data_salt
+[RUST]   session_state -> ESTABLISHED
+[RUST]   finish SUCCESS: session established
+[RUST]   FINISH success: session established
+[RUST]   start_session SUCCESS: session_id=0xffffffff
+[EL0_APP] func_id=256 session_id=0xffffffff
+[C_TDISP_LOCK] ENTRY: param_type=1 (expected=1)
+[C_TDISP_LOCK] Calling dvsec_init...
+dvsec_init: ecam_addr=0x5da7c5f5f000, rp_id=0x0
+dvsec_init: rp_ecam_addr=0x5da7c5f5f000
+dvsec_init: RP ECAM 0x5da7c5f5f000, DVSEC offset 0x100
+[C_TDISP_LOCK] dvsec_init SUCCESS, calling pci_tdisp_get_version...
+dvsec_init: ecam_addr=0x5da7c5f5f000, rp_id=0x0
+dvsec_init: rp_ecam_addr=0x5da7c5f5f000
+dvsec_init: RP ECAM 0x5da7c5f5f000, DVSEC offset 0x100
+[RUST-TDISP] pci_tdisp_get_version ENTRY
+[RUST-TDISP] pci_tdisp_send_receive_vdm type=0x81 req_size=28
+[RUST-SEND] send_receive_data session=0xffffffff size=28
+[RUST] send_receive_data(context=0x3085d2e0, session=0xffffffff, is_app=0, req_size=28)
+[RUST-SR-ENTRY] context=0x57df3085d2e0 session=0x57df3085f730
+[RUST] call_acquire_sender(func=0x18c4dcc0)
+[RUST]   acquire_sender ret=0, buf=0x308532e0
+[RUST] call_transport_encode(func=0x18c4ee10, session=0x3085f730, spdm_size=28, buf_cap=4096)
+[RUST]   calling transport_encode callback
+[RUST]   BEFORE: encoded_size=4096, ptr_addr=0x73860dffd9e0
+[RUST-PRE-CALL] encoded_size=4096 ptr=0x73860dffd9e0 buf=0x57df308532e0
+[RUST] get_secured_msg_ctx(context=0x3085d2e0, session=0xffffffff)
+[C-ENCODE-BEFORE] transport_message_size=4096 ptr=0x73860dffd9e0 sec_msg=0x57df308532e0
+[RUST] encode_secured_msg(session=0xffffffff, req=1, msg_size=28, payload_len=46)
+[RUST]   session_state=2 (HANDSHAKING=1, ESTABLISHED=2)
+[RUST]   seq_num=0
+[RUST]   ciphertext len=46 (enc=30 + tag=16)
+[RUST]   SUCCESS: secured_message_size=52
+[C-ENCODE-AFTER] status=0 sec_msg_size=52
+[C-ENCODE-FINAL] *transport_message_size=52 ptr=0x73860dffd9e0
+[RUST-POST-CALL] ret=0 encoded_size=52 ptr=0x57df308532e0
+[RUST]   AFTER: ret=0, encoded_size=52, ptr=0x308532e0
+[RUST-ENCODE] ret=0 size=52
+[RUST]   transport_encode success: transport_size=52
+[RUST]   DOE alignment: 52 -> 52
+[RUST] call_send(func=0x18c4e490, buf=0x308532e0, size=52)
+[C_DEBUG] SEND_YIELD: flags=0x4 RSP_CACHE=0 REQ_SEND=1 protocol=1 is_sspdm=1
+[RUST]   send ret=0, context=0x3085d2e0
+[RUST]   send success (size=52)
+[RUST] call_release_sender(func=0x18c4dce0, buf=0x308532e0)
+[RUST] call_acquire_receiver(func=0x18c4ecd0)
+[RUST-ACQ-RECV] func=0x57df18c4ecd0 context=0x57df3085d2e0
+[RUST-ACQ-RECV] ret=0 buf=0x57df308532e0
+[RUST]   acquire_receiver ret=0, buf=0x308532e0
+[RUST-PRE-RECV] acquired buf=0x57df308532e0
+[RUST-PRE-RECV2] recv_buf_ptr=0x57df308532e0 addr=0x73860dffd9f0
+[RUST] call_recv(func=0x18c4e5d0)
+[C_RECV] ENTRY: resp_len=56 status=1 response=0x57df308532e0 send_recv_buf=0x57df308532e0
+[C_RECV] BEFORE_SERVICE_CALL: buf_offset=0 resp_addr=0x5da7a5f89000 resp_len_align=56
+[C_RECV] AFTER_SERVICE_CALL: rc=0
+ESS 5e
+Realm executed successfully and exited due to FIQ.
+[STAGE 3 DONE] Attestation completed
+[STAGE 4] host_vdev_assign() - VDEV assignment to Realm
+SMC_RMI_VDEV_CREATE               5da7a5f5f000 5da7a5f7d000 5da7a5f86000 5da7a5f8a000 > RMI_SUCCESS
+[STAGE 4 DONE] host_vdev_id = 0
+[STAGE 5] host_realm_run_da() - Device Assignment RSI tests
+Realm executed DA RSI successfully
+[STAGE 5 DONE] Device Assignment completed
+[STAGE 6] host_vdev_tdisp_start() - TDISP Lock and Start
+SMC_RMI_VDEV_GET_STATE            5da7a5f86000 > RMI_SUCCESS 0
+[TDISP] Transitioning VDEV from NEW to UNLOCKED...
+SMC_RMI_VDEV_GET_STATE            5da7a5f86000 > RMI_SUCCESS 0
+SMC_RMI_VDEV_COMMUNICATE          5da7a5f5f000 5da7a5f7d000 5da7a5f86000 5da7a5f87000 > RMI_SUCCESS
+SMC_RMI_VDEV_GET_STATE            5da7a5f86000 > RMI_SUCCESS 1
+[TDISP] VDEV now UNLOCKED
+[TDISP] Locking VDEV...
+SMC_RMI_VDEV_LOCK                 5da7a5f5f000 5da7a5f7d000 5da7a5f86000 > RMI_SUCCESS
+SMC_RMI_VDEV_GET_STATE            5da7a5f86000 > RMI_SUCCESS 1
+SMC_RMI_VDEV_COMMUNICATE          5da7a5f5f000 5da7a5f7d000 5da7a5f86000 5da7a5f87000 > RMI_SUCCESS
+[SPDM TX] DOE header: vendor_id=0x1, type=2, len=15
+[SPDM TX] Request data: len=52 bytes
+0000: ff ff ff ff 2e 00 e4 dc 4a 21 18 55 47 cf 3f e7 
+0010: 8b 89 3a 7b 7a 5e bd a7 f8 63 9f f0 63 b0 04 4f 
+0020: 8f c8 2a 60 12 ce 2a 0f a7 c8 70 31 50 0d c3 16 
+0030: 91 92 39 28 
+[SPDM RX] DOE header: vendor_id=0x1, type=2, len=16
+[SPDM RX] Response data: len=56 bytes
+0000: ff ff ff ff 30 00 d4 f3 1f 9e 75 5c 1d 34 e9 7e 
+0010: f3 45 cd a8 47 17 85 c8 bb 87 e3 c3 64 06 dc 43 
+0020: b6 6f 50 1c 0d 47 84 44 b6 d4 68 7d b0 83 4d 14 
+0030: cf d0 b9 cf 05 30 00 00 
+SMC_RMI_VDEV_GET_STATE            5da7a5f86000 > RMI_SUCCESS 1
+ERROR: Failed to read 8 bytes at app_run_internal:274
+
+============================================================
+[STEP] Running RMM...
+============================================================
+[INFO] Using internal SPDM responder (embedded in RMM ELF)
+
+[RUN] /home/lmm/code/tf-rmm/build/Release/rmm.elf
+------------------------------------------------------------
+------------------------------------------------------------
+[DONE] RMM exited with code 1
+[90m[SPDM-EMU] Platform port Transmit size: 00 00 00 3c [0m
+[90m[SPDM-EMU] Platform port Transmit buffer:[0m
+[90m[SPDM-EMU]     01 00 01 00 0f 00 00 00 12 65 00 00 94 e9 40 07 e9 a7 48 4c 24 86 f0 7e 12 e2 d9 8e 2a 90 19 48 32 23 6a cc 9f d1 f0 f1 e9 22 b6 04 b1 6c d7 c8 e0 73 2c 6a 22 35 79 de f0 88 e4 28 [0m
+[90m[SPDM-EMU] Platform port Receive command: 00 00 00 01 [0m
+[90m[SPDM-EMU] Platform port Receive transport_type: 00 00 00 02 [0m
+[90m[SPDM-EMU] Platform port Receive size: 00 00 00 3c [0m
+[90m[SPDM-EMU] Platform port Receive buffer:[0m
+[90m[SPDM-EMU]     01 00 02 00 0f 00 00 00 ff ff ff ff 2e 00 e4 dc 4a 21 18 55 47 cf 3f e7 8b 89 3a 7b 7a 5e bd a7 f8 63 9f f0 63 b0 04 4f 8f c8 2a 60 12 ce 2a 0f a7 c8 70 31 50 0d c3 16 91 92 39 28 [0m
+[90m[SPDM-EMU] SpdmReceiveRequest[.] ...[0m
+[90m[SPDM-EMU] SpdmReceiveRequest[ffffffff] msg SPDM_VENDOR_DEFINED_REQUEST(0xfe), size (0x1c): [0m
+[90m[SPDM-EMU] 0000: 12 fe 00 00 03 00 02 01 00 11 00 01 10 81 00 00 00 01 00 00 00 00 00 00 00 00 00 00 [0m
+[90m[SPDM-EMU] SpdmSendResponse[ffffffff] ...[0m
+[90m[SPDM-EMU] SpdmSendResponse[ffffffff]: msg SPDM_VENDOR_DEFINED_RESPONSE(0x7e), size (0x1e): [0m
+[90m[SPDM-EMU] 0000: 12 7e 00 00 03 00 02 01 00 13 00 01 10 01 00 00 00 01 00 00 00 00 00 00 00 00 00 00 01 10 [0m
+[90m[SPDM-EMU] Platform port Transmit command: 00 00 00 01 [0m
+[90m[SPDM-EMU] Platform port Transmit transport_type: 00 00 00 02 [0m
+[90m[SPDM-EMU] Platform port Transmit size: 00 00 00 40 [0m
+[90m[SPDM-EMU] Platform port Transmit buffer:[0m
+[90m[SPDM-EMU]     01 00 02 00 10 00 00 00 ff ff ff ff 30 00 d4 f3 1f 9e 75 5c 1d 34 e9 7e f3 45 cd a8 47 17 85 c8 bb 87 e3 c3 64 06 dc 43 b6 6f 50 1c 0d 47 84 44 b6 d4 68 7d b0 83 4d 14 cf d0 b9 cf 05 30 00 00 [0m
+[90m[SPDM-EMU] receive_platform_data Error - 0[0m
+[90m[SPDM-EMU] Server Critical Error - STOP[0m
+[90m[SPDM-EMU] Server stopped[0m

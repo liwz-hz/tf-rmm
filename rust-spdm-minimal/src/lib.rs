@@ -28,7 +28,7 @@ pub use protocol::{
 };
 pub use crypto::{
     sha256, sha384, SHA256_SIZE, SHA384_SIZE, MAX_HASH_SIZE,
-    aes128_gcm_encrypt, aes128_gcm_decrypt, aes256_gcm_encrypt, aes256_gcm_decrypt,
+    aes128_gcm_encrypt, aes128_gcm_decrypt, aes256_gcm_encrypt, aes256_gcm_decrypt, aes256_gcm_decrypt_into,
     EcdhP256KeyPair, EcdhP384KeyPair, ecdh_p256_keypair, ecdh_p384_keypair,
     ecdsa_verify_p256, ecdsa_verify_p384,
     hkdf_extract_sha256, hkdf_expand_sha256, hkdf_extract_sha384, hkdf_expand_sha384,

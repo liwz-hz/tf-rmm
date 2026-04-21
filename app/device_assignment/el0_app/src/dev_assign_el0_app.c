@@ -196,6 +196,10 @@ static libspdm_return_t spdm_receive_message(void *spdm_context,
 
 	assert(info->enter_args.status == RMI_DEV_COMM_ENTER_STATUS_RESPONSE);
 
+	printf("[C_RECV] BEFORE_SERVICE_CALL: buf_offset=%lu resp_addr=0x%lx resp_len_align=%lu\n",
+	       (unsigned long)buf_offset, (unsigned long)info->enter_args.resp_addr, resp_len_align);
+	fflush(stdout);
+
 	/*
 	 * Sending the message. Device communication request is written to the
 	 * NS buffer.
@@ -204,7 +208,12 @@ static libspdm_return_t spdm_receive_message(void *spdm_context,
 		APP_SERVICE_RW_NS_BUF_HEAP, (unsigned long)buf_offset,
 		info->enter_args.resp_addr, resp_len_align);
 
+	printf("[C_RECV] AFTER_SERVICE_CALL: rc=%d\n", rc);
+	fflush(stdout);
+
 	if (rc != 0) {
+		printf("[C_RECV] SERVICE_CALL_FAILED: returning RECEIVE_FAIL\n");
+		fflush(stdout);
 		return LIBSPDM_STATUS_RECEIVE_FAIL;
 	}
 

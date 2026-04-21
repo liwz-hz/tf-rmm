@@ -188,6 +188,8 @@
 
 #define LIBSPDM_STATUS_INVALID_MSG_FIELD 2147483652
 
+#define LIBSPDM_STATUS_INVALID_MSG_SIZE 2147483653
+
 #define LIBSPDM_STATUS_UNSUPPORTED_CAP 2147483650
 
 #define LIBSPDM_STATUS_RECEIVE_FAIL 2147745793
@@ -462,7 +464,7 @@ libspdm_return_t libspdm_decode_secured_message(void *_secured_message_context,
                                                 uintptr_t secured_message_size,
                                                 const uint8_t *secured_message,
                                                 uintptr_t *message_size,
-                                                uint8_t *message);
+                                                void **message);
 
 bool libspdm_is_session_established(libspdm_context_t context, libspdm_session_id_t session_id);
 

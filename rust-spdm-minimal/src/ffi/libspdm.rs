@@ -1,7 +1,7 @@
 use core::ffi::c_void;
 use core::sync::atomic::{AtomicPtr, AtomicU32, AtomicU16, AtomicU8, AtomicU64, Ordering};
 
-use crate::crypto::{ecdh_p384_keypair, EcdhP384KeyPair, P384_PUBLIC_KEY_RAW_SIZE, random_bytes, sha384, hkdf_extract_sha384, hkdf_expand_sha384, hmac_sha384, aes256_gcm_encrypt, aes256_gcm_decrypt};
+use crate::crypto::{ecdh_p384_keypair, EcdhP384KeyPair, P384_PUBLIC_KEY_RAW_SIZE, random_bytes, sha384, hkdf_extract_sha384, hkdf_expand_sha384, hmac_sha384, aes256_gcm_encrypt, aes256_gcm_decrypt, aes256_gcm_decrypt_into};
 use alloc::vec::Vec;
 
 extern "C" {
@@ -14,6 +14,7 @@ pub const LIBSPDM_STATUS_ERROR: u32 = 1;
 pub const LIBSPDM_STATUS_BUFFER_TOO_SMALL: u32 = 0x80000007;
 pub const LIBSPDM_STATUS_CRYPTO_ERROR: u32 = 0x80000003;
 pub const LIBSPDM_STATUS_INVALID_MSG_FIELD: u32 = 0x80000004;
+pub const LIBSPDM_STATUS_INVALID_MSG_SIZE: u32 = 0x80000005;
 pub const LIBSPDM_STATUS_UNSUPPORTED_CAP: u32 = 0x80000002;
 pub const LIBSPDM_STATUS_RECEIVE_FAIL: u32 = 0x80040001;
 
@@ -577,7 +578,10 @@ unsafe fn call_recv(context: libspdm_context_t, buf: *mut *mut c_void, size: *mu
     let func: extern "C" fn(libspdm_context_t, *mut usize, *mut *mut c_void, u64) -> libspdm_return_t =
         core::mem::transmute(func_ptr);
     let ret = func(context, size, buf, 0);
-    debug_print!("  recv ret=%u, size=%zu", ret, *size);
+    unsafe {
+        printf(b"[RUST] recv ret=%u, size=%zu\n\0".as_ptr() as *const i8, ret, *size);
+        fflush(0 as *mut core::ffi::c_void);
+    }
     ret
 }
 
@@ -657,15 +661,26 @@ unsafe fn call_transport_decode(
     message_size: *mut usize,
     message: *mut *mut c_void,
 ) -> libspdm_return_t {
+    unsafe {
+        printf(b"[RUST-DECODE-ENTRY] transport_msg=%p transport_size=%zu\n\0".as_ptr() as *const i8,
+               transport_msg as *const c_void, transport_size);
+        fflush(0 as *mut core::ffi::c_void);
+    }
     let func_ptr = SPDM_CTX.transport_decode.load(Ordering::SeqCst);
-    debug_print!("call_transport_decode(func_ptr=%p, size=%u)", func_ptr, transport_size as u32);
+    unsafe {
+        printf(b"[RUST-DECODE-FUNC] func_ptr=%p\n\0".as_ptr() as *const i8, func_ptr as *const c_void);
+        fflush(0 as *mut core::ffi::c_void);
+    }
     if func_ptr.is_null() {
-        debug_print!("  transport_decode is NULL, returning raw message");
+        unsafe { printf(b"[RUST-DECODE-NULL] func_ptr is NULL\n\0".as_ptr() as *const i8); }
         *message_size = transport_size;
         *message = transport_msg;
         return LIBSPDM_STATUS_SUCCESS;
     }
-    debug_print!("  calling transport_decode callback");
+unsafe {
+        printf(b"[RUST-DECODE-CALL] calling transport_decode callback\n\0".as_ptr() as *const i8);
+        fflush(0 as *mut core::ffi::c_void);
+    }
     
     // Signature: libspdm_return_t (*)(void*, uint32_t**, bool*, bool, size_t, void*, size_t*, void**)
     let func: extern "C" fn(
@@ -682,6 +697,11 @@ unsafe fn call_transport_decode(
     let mut session_id: *mut u32 = core::ptr::null_mut();
     let mut is_app_message: bool = false;
     
+    unsafe {
+        printf(b"[RUST-DECODE-PRE-CALL] calling C callback now\n\0".as_ptr() as *const i8);
+        fflush(0 as *mut core::ffi::c_void);
+    }
+    
     let ret = func(
         context,
         &mut session_id,
@@ -692,7 +712,12 @@ unsafe fn call_transport_decode(
         message_size,
         message,
     );
-    debug_print!("  transport_decode ret=%u, msg_size=%zu", ret, *message_size);
+    
+    unsafe {
+        printf(b"[RUST-DECODE-POST-CALL] callback returned: ret=%u msg_size=%zu msg=%p\n\0".as_ptr() as *const i8,
+               ret, *message_size, *message as *const c_void);
+        fflush(0 as *mut core::ffi::c_void);
+    }
     ret
 }
 
@@ -2729,6 +2754,17 @@ pub extern "C" fn libspdm_finish(
             b'a', b'p', b'p', b' ',
             b'd', b'a', b't', b'a',
         ].iter().cloned().chain(th2.iter().cloned()).collect();
+        unsafe {
+            printf(b"[RUST-BIN-STR4] len=%zu first22=%02x%02x%02x%02x%02x%02x%02x%02x%02x%02x%02x%02x%02x%02x%02x%02x%02x%02x%02x%02x%02x%02x\n\0".as_ptr() as *const i8,
+                   bin_str4.len() as u32,
+                   bin_str4[0] as u32, bin_str4[1] as u32, bin_str4[2] as u32, bin_str4[3] as u32,
+                   bin_str4[4] as u32, bin_str4[5] as u32, bin_str4[6] as u32, bin_str4[7] as u32,
+                   bin_str4[8] as u32, bin_str4[9] as u32, bin_str4[10] as u32, bin_str4[11] as u32,
+                   bin_str4[12] as u32, bin_str4[13] as u32, bin_str4[14] as u32, bin_str4[15] as u32,
+                   bin_str4[16] as u32, bin_str4[17] as u32, bin_str4[18] as u32, bin_str4[19] as u32,
+                   bin_str4[20] as u32, bin_str4[21] as u32);
+            fflush(0 as *mut core::ffi::c_void);
+        }
         let rsp_data_secret = match hkdf_expand_sha384(&master_secret, &bin_str4, 48) {
             Ok(s) => s,
             Err(_) => {
@@ -2736,6 +2772,12 @@ pub extern "C" fn libspdm_finish(
                 return LIBSPDM_STATUS_CRYPTO_ERROR;
             }
         };
+        unsafe {
+            printf(b"[RUST-KEY] response_data_secret first8=%02x%02x%02x%02x%02x%02x%02x%02x\n\0".as_ptr() as *const i8,
+                   rsp_data_secret[0] as u32, rsp_data_secret[1] as u32, rsp_data_secret[2] as u32, rsp_data_secret[3] as u32,
+                   rsp_data_secret[4] as u32, rsp_data_secret[5] as u32, rsp_data_secret[6] as u32, rsp_data_secret[7] as u32);
+            fflush(0 as *mut core::ffi::c_void);
+        }
         debug_print!("  derived response_data_secret");
         
         // Derive response_data_encryption_key
@@ -2746,6 +2788,12 @@ pub extern "C" fn libspdm_finish(
                 return LIBSPDM_STATUS_CRYPTO_ERROR;
             }
         };
+        unsafe {
+            printf(b"[RUST-KEY] response_data_enc_key first8=%02x%02x%02x%02x%02x%02x%02x%02x\n\0".as_ptr() as *const i8,
+                   rsp_enc_key[0] as u32, rsp_enc_key[1] as u32, rsp_enc_key[2] as u32, rsp_enc_key[3] as u32,
+                   rsp_enc_key[4] as u32, rsp_enc_key[5] as u32, rsp_enc_key[6] as u32, rsp_enc_key[7] as u32);
+            fflush(0 as *mut core::ffi::c_void);
+        }
         for i in 0..32 {
             SPDM_CTX.response_data_encryption_key[i].store(rsp_enc_key[i], Ordering::SeqCst);
         }
@@ -3038,11 +3086,16 @@ pub extern "C" fn libspdm_decode_secured_message(
     secured_message_size: usize,
     secured_message: *const u8,
     message_size: *mut usize,
-    message: *mut u8,
+    message: *mut *mut c_void,  // libspdm_secured_message_callbacks_t (ignored)
 ) -> libspdm_return_t {
-    debug_print!("decode_secured_msg(session=0x%x, req=%u, secured_size=%zu)", session_id, is_request_message as u32, secured_message_size);
+    unsafe {
+        printf(b"[RUST-DECODE-SEC] ENTRY: session=0x%x req=%u size=%zu\n\0".as_ptr() as *const i8,
+               session_id, is_request_message as u32, secured_message_size);
+        fflush(0 as *mut core::ffi::c_void);
+    }
     
     if secured_message.is_null() || message.is_null() || message_size.is_null() {
+        unsafe { printf(b"[RUST-DECODE-SEC] ERROR: null params\n\0".as_ptr() as *const i8); }
         return LIBSPDM_STATUS_ERROR;
     }
     
@@ -3051,7 +3104,8 @@ pub extern "C" fn libspdm_decode_secured_message(
     let cipher_header_size = 2;  // application_data_length field
     
     if secured_message_size < header_size + cipher_header_size + aead_tag_size {
-        debug_print!("  ERROR: secured message too small");
+        unsafe { printf(b"[RUST-DECODE-SEC] ERROR: too small (%zu < %zu)\n\0".as_ptr() as *const i8,
+               secured_message_size, header_size + cipher_header_size + aead_tag_size); }
         return LIBSPDM_STATUS_INVALID_MSG_FIELD;
     }
     
@@ -3060,13 +3114,18 @@ pub extern "C" fn libspdm_decode_secured_message(
         
         let msg_session_id = u32::from_le_bytes([secured[0], secured[1], secured[2], secured[3]]);
         if msg_session_id != session_id {
-            debug_print!("  ERROR: session_id mismatch (msg=0x%x, expected=0x%x)", msg_session_id, session_id);
+            printf(b"[RUST-DECODE-SEC] ERROR: session mismatch (msg=0x%x != exp=0x%x)\n\0".as_ptr() as *const i8,
+                   msg_session_id, session_id);
             return LIBSPDM_STATUS_INVALID_MSG_FIELD;
         }
         
         // Read length field (2 bytes at offset 4) = cipher_text_size + aead_tag_size
         let payload_length = u16::from_le_bytes([secured[4], secured[5]]) as usize;
         let cipher_text_size = payload_length - aead_tag_size;
+        
+        printf(b"[RUST-DECODE-SEC] payload_len=%u cipher_size=%zu\n\0".as_ptr() as *const i8,
+               payload_length as u32, cipher_text_size);
+        fflush(0 as *mut core::ffi::c_void);
         
         // Sequence number NOT in header, use stored value for IV generation
         let seq_num: u64;
@@ -3090,15 +3149,21 @@ pub extern "C" fn libspdm_decode_secured_message(
         let app_data_size = cipher_text_size - cipher_header_size;
         let buffer_capacity = *message_size;
         
-        if buffer_capacity < app_data_size {
-            debug_print!("  ERROR: buffer too small (cap=%zu, need=%zu)", buffer_capacity, app_data_size);
+        // Check buffer capacity for full plaintext (including header)
+        if buffer_capacity < cipher_text_size {
+            printf(b"[RUST-DECODE-SEC] ERROR: buffer too small (cap=%zu, need=%zu)\n\0".as_ptr() as *const i8,
+                   buffer_capacity, cipher_text_size);
             return LIBSPDM_STATUS_BUFFER_TOO_SMALL;
         }
         
         let (enc_key, salt) = {
             let session_state = SPDM_CTX.session_state.load(Ordering::SeqCst);
+            printf(b"[RUST-DECODE-SEC] session_state=%u seq_num=%llu\n\0".as_ptr() as *const i8,
+                   session_state, seq_num as u64);
+            fflush(0 as *mut core::ffi::c_void);
             if session_state == LIBSPDM_SESSION_STATE_ESTABLISHED {
                 if is_request_message {
+                    printf(b"[RUST-DECODE-SEC] Using request_data keys\n\0".as_ptr() as *const i8);
                     let mut key = [0u8; 32];
                     for i in 0..32 {
                         key[i] = SPDM_CTX.request_data_encryption_key[i].load(Ordering::SeqCst);
@@ -3109,6 +3174,7 @@ pub extern "C" fn libspdm_decode_secured_message(
                     }
                     (key, slt)
                 } else {
+                    printf(b"[RUST-DECODE-SEC] Using response_data keys\n\0".as_ptr() as *const i8);
                     let mut key = [0u8; 32];
                     for i in 0..32 {
                         key[i] = SPDM_CTX.response_data_encryption_key[i].load(Ordering::SeqCst);
@@ -3121,6 +3187,7 @@ pub extern "C" fn libspdm_decode_secured_message(
                 }
             } else {
                 if is_request_message {
+                    printf(b"[RUST-DECODE-SEC] Using request_handshake keys\n\0".as_ptr() as *const i8);
                     let mut key = [0u8; 32];
                     for i in 0..32 {
                         key[i] = SPDM_CTX.request_handshake_encryption_key[i].load(Ordering::SeqCst);
@@ -3131,6 +3198,7 @@ pub extern "C" fn libspdm_decode_secured_message(
                     }
                     (key, slt)
                 } else {
+                    printf(b"[RUST-DECODE-SEC] Using response_handshake keys\n\0".as_ptr() as *const i8);
                     let mut key = [0u8; 32];
                     for i in 0..32 {
                         key[i] = SPDM_CTX.response_handshake_encryption_key[i].load(Ordering::SeqCst);
@@ -3144,10 +3212,29 @@ pub extern "C" fn libspdm_decode_secured_message(
             }
         };
         
+        printf(b"[RUST-DECODE-SEC] key first8=%02x%02x%02x%02x%02x%02x%02x%02x salt first8=%02x%02x%02x%02x%02x%02x%02x%02x\n\0".as_ptr() as *const i8,
+               enc_key[0] as u32, enc_key[1] as u32, enc_key[2] as u32, enc_key[3] as u32, 
+               enc_key[4] as u32, enc_key[5] as u32, enc_key[6] as u32, enc_key[7] as u32,
+               salt[0] as u32, salt[1] as u32, salt[2] as u32, salt[3] as u32, 
+               salt[4] as u32, salt[5] as u32, salt[6] as u32, salt[7] as u32);
+        fflush(0 as *mut core::ffi::c_void);
+        
         let mut iv = salt;
         let seq_bytes = seq_num.to_le_bytes();
         for i in 0..8 {
             iv[i] ^= seq_bytes[i];
+        }
+        
+        unsafe {
+            printf(b"[RUST-IV] salt=%02x%02x%02x%02x%02x%02x%02x%02x%02x%02x%02x%02x seq_num=%llu iv=%02x%02x%02x%02x%02x%02x%02x%02x%02x%02x%02x%02x\n\0".as_ptr() as *const i8,
+                   salt[0] as u32, salt[1] as u32, salt[2] as u32, salt[3] as u32,
+                   salt[4] as u32, salt[5] as u32, salt[6] as u32, salt[7] as u32,
+                   salt[8] as u32, salt[9] as u32, salt[10] as u32, salt[11] as u32,
+                   seq_num as u64,
+                   iv[0] as u32, iv[1] as u32, iv[2] as u32, iv[3] as u32,
+                   iv[4] as u32, iv[5] as u32, iv[6] as u32, iv[7] as u32,
+                   iv[8] as u32, iv[9] as u32, iv[10] as u32, iv[11] as u32);
+            fflush(0 as *mut core::ffi::c_void);
         }
         
         // AAD = session_id (4 bytes) + length (2 bytes)
@@ -3160,23 +3247,95 @@ pub extern "C" fn libspdm_decode_secured_message(
             length_bytes[0], length_bytes[1],
         ].to_vec();
         
-        let ciphertext = &secured[header_size..secured_message_size];
+        unsafe {
+            printf(b"[RUST-AAD] session_id=0x%x len=%u aad=%02x%02x%02x%02x%02x%02x\n\0".as_ptr() as *const i8,
+                   session_id, payload_length as u32,
+                   aad[0] as u32, aad[1] as u32, aad[2] as u32, aad[3] as u32,
+                   aad[4] as u32, aad[5] as u32);
+            fflush(0 as *mut core::ffi::c_void);
+        }
+        
+        // Ciphertext = entire payload (cipher_text + aead_tag), NOT including DOE padding
+        // payload_length from header = cipher_text_size + aead_tag_size
+        let ct_start = header_size;
+        let ct_end = header_size + payload_length;  // Use payload_length, NOT secured_message_size
+        let ciphertext = &secured[ct_start..ct_end];
+        
+        unsafe {
+            printf(b"[RUST-CT] header_size=%zu payload_len=%zu ct_start=%zu ct_end=%zu ct_len=%zu ct_first8=%02x%02x%02x%02x%02x%02x%02x%02x\n\0".as_ptr() as *const i8,
+                   header_size as u32, payload_length as u32, ct_start as u32, ct_end as u32, ciphertext.len() as u32,
+                   ciphertext[0] as u32, ciphertext[1] as u32, ciphertext[2] as u32, ciphertext[3] as u32,
+                   ciphertext[4] as u32, ciphertext[5] as u32, ciphertext[6] as u32, ciphertext[7] as u32);
+            fflush(0 as *mut core::ffi::c_void);
+        }
+        
+        printf(b"[RUST-DECODE-SEC] BEFORE AES-GCM: key_len=32 iv_len=12 aad_len=6 ct_len=%zu\n\0".as_ptr() as *const i8,
+               ciphertext.len());
+        fflush(0 as *mut core::ffi::c_void);
         
         let plaintext = match aes256_gcm_decrypt(&enc_key, &iv, &aad, ciphertext) {
-            Ok(pt) => pt,
+            Ok(pt) => {
+                printf(b"[RUST-DECODE-SEC] AES-GCM SUCCESS: pt_len=%zu pt[0]=0x%02x pt[1]=0x%02x\n\0".as_ptr() as *const i8, 
+                       pt.len(), pt[0] as u32, pt[1] as u32);
+                fflush(0 as *mut core::ffi::c_void);
+                pt
+            },
             Err(_) => {
-                debug_print!("  ERROR: AES-GCM decryption failed");
+                printf(b"[RUST-DECODE-SEC] ERROR: AES-GCM decryption failed\n\0".as_ptr() as *const i8);
+                fflush(0 as *mut core::ffi::c_void);
                 return LIBSPDM_STATUS_CRYPTO_ERROR;
             }
         };
         
-        // Skip cipher_header (2 bytes) and copy app_data to output
-        let output = core::slice::from_raw_parts_mut(message, app_data_size);
-        output.copy_from_slice(&plaintext[cipher_header_size..]);
+        printf(b"[RUST-DECODE-SEC] STEP1: plaintext decrypted\n\0".as_ptr() as *const i8);
+        fflush(0 as *mut core::ffi::c_void);
         
-        *message_size = app_data_size;
+        let caller_buffer = *message as *mut u8;
+        printf(b"[RUST-DECODE-SEC] STEP2: caller_buffer=%p\n\0".as_ptr() as *const i8, caller_buffer);
+        fflush(0 as *mut core::ffi::c_void);
         
-        debug_print!("  SUCCESS: app_data_size=%zu", *message_size);
+        printf(b"[RUST-DECODE-SEC] STEP3: copying %zu bytes\n\0".as_ptr() as *const i8, plaintext.len());
+        fflush(0 as *mut core::ffi::c_void);
+        
+        core::ptr::copy_nonoverlapping(plaintext.as_ptr(), caller_buffer, plaintext.len());
+        
+        printf(b"[RUST-DECODE-SEC] STEP4: copy done\n\0".as_ptr() as *const i8);
+        fflush(0 as *mut core::ffi::c_void);
+        
+        let plain_text_size = u16::from_le_bytes([plaintext[0], plaintext[1]]) as usize;
+        printf(b"[RUST-DECODE-SEC] STEP5: plain_text_size=%zu\n\0".as_ptr() as *const i8, plain_text_size);
+        fflush(0 as *mut core::ffi::c_void);
+        
+        if plain_text_size > plaintext.len() - cipher_header_size {
+            printf(b"[RUST-DECODE-SEC] ERROR: plain_text_size invalid\n\0".as_ptr() as *const i8);
+            return LIBSPDM_STATUS_INVALID_MSG_SIZE;
+        }
+        
+        printf(b"[RUST-DECODE-SEC] STEP6: adjusting pointer\n\0".as_ptr() as *const i8);
+        fflush(0 as *mut core::ffi::c_void);
+        
+        *message = (caller_buffer.add(cipher_header_size)) as *mut c_void;
+        *message_size = plain_text_size;
+        
+        // Increment sequence number after successful decryption (C pattern line 461-465)
+        let session_state = SPDM_CTX.session_state.load(Ordering::SeqCst);
+        if session_state == LIBSPDM_SESSION_STATE_ESTABLISHED {
+            if is_request_message {
+                SPDM_CTX.request_data_sequence_number.fetch_add(1, Ordering::SeqCst);
+            } else {
+                SPDM_CTX.response_data_sequence_number.fetch_add(1, Ordering::SeqCst);
+            }
+        } else {
+            if is_request_message {
+                SPDM_CTX.request_handshake_sequence_number.fetch_add(1, Ordering::SeqCst);
+            } else {
+                SPDM_CTX.response_handshake_sequence_number.fetch_add(1, Ordering::SeqCst);
+            }
+        }
+        
+        printf(b"[RUST-DECODE-SEC] STEP7: DONE! message=%p size=%zu\n\0".as_ptr() as *const i8, *message, *message_size);
+        fflush(0 as *mut core::ffi::c_void);
+        fflush(0 as *mut core::ffi::c_void);
     }
     
     LIBSPDM_STATUS_SUCCESS
@@ -3438,16 +3597,31 @@ pub extern "C" fn libspdm_send_receive_data(
         }
         
         let recv_ret = call_recv(context, &mut recv_buf_ptr, &mut recv_size);
+        unsafe {
+            printf(b"[RUST] recv returned: ret=%u size=%zu\n\0".as_ptr() as *const i8, recv_ret, recv_size);
+            fflush(0 as *mut core::ffi::c_void);
+        }
         if recv_ret != LIBSPDM_STATUS_SUCCESS {
-            debug_print!("  recv failed: ret=%u", recv_ret);
+            unsafe { printf(b"[RUST] recv FAILED: ret=%u\n\0".as_ptr() as *const i8, recv_ret); }
             return recv_ret;
         }
         
-        debug_print!("  recv success: raw_size=%zu", recv_size);
+        unsafe {
+            printf(b"[RUST] proceeding to transport_decode, size=%zu\n\0".as_ptr() as *const i8, recv_size);
+            fflush(0 as *mut core::ffi::c_void);
+        }
         
         // Step 6: Call transport_decode to unwrap (secured message decode if session)
-        let mut decoded_msg: *mut c_void = core::ptr::null_mut();
+        // C pattern: pass receiver buffer as the initial message buffer
+        // libspdm_decode_secured_message decrypts into this buffer and adjusts pointer
+        let mut decoded_msg: *mut c_void = recv_buf_ptr;  // Start with receiver buffer, not NULL!
         let mut decoded_size: usize = 4096;  // Buffer capacity for decode output
+        
+        unsafe {
+            printf(b"[RUST-PRE-DECODE] calling call_transport_decode: recv_buf=%p recv_size=%zu decoded_msg=%p\n\0".as_ptr() as *const i8,
+                   recv_buf_ptr as *const c_void, recv_size, decoded_msg as *const c_void);
+            fflush(0 as *mut core::ffi::c_void);
+        }
         
         let decode_ret = call_transport_decode(
             context,
@@ -3456,6 +3630,12 @@ pub extern "C" fn libspdm_send_receive_data(
             &mut decoded_size,
             &mut decoded_msg,
         );
+        
+        unsafe {
+            printf(b"[RUST-POST-DECODE] decode_ret=%u decoded_size=%zu decoded_msg=%p\n\0".as_ptr() as *const i8,
+                   decode_ret, decoded_size, decoded_msg as *const c_void);
+            fflush(0 as *mut core::ffi::c_void);
+        }
         
         if decode_ret != LIBSPDM_STATUS_SUCCESS {
             debug_print!("  transport_decode failed: ret=%u", decode_ret);

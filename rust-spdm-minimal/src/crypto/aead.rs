@@ -86,6 +86,31 @@ pub fn aes256_gcm_decrypt(key: &[u8], iv: &[u8], aad: &[u8], ciphertext: &[u8]) 
     SpdmAes256Gcm.decrypt(key, iv, aad, ciphertext)
 }
 
+pub fn aes256_gcm_decrypt_into(key: &[u8], iv: &[u8], aad: &[u8], ciphertext: &[u8], output: &mut [u8]) -> bool {
+    if key.len() != AES256_KEY_SIZE || iv.len() != GCM_IV_SIZE {
+        return false;
+    }
+    
+    let cipher = match Aes256Gcm::new_from_slice(key) {
+        Ok(c) => c,
+        Err(_) => return false,
+    };
+    
+    let expected_output_size = ciphertext.len() - GCM_TAG_SIZE;
+    if output.len() < expected_output_size {
+        return false;
+    }
+    
+    let payload = Payload { msg: ciphertext, aad };
+    match cipher.decrypt(iv.into(), payload) {
+        Ok(decrypted) => {
+            output[..expected_output_size].copy_from_slice(&decrypted);
+            true
+        }
+        Err(_) => false,
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
