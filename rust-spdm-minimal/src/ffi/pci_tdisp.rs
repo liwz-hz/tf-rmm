@@ -194,7 +194,7 @@ fn pci_tdisp_send_receive_vdm(
     let vdm_req_size = 12 + tdisp_request_size;
     let mut vdm_request: [u8; 12 + MAX_TDISP_SIZE] = [0; 12 + MAX_TDISP_SIZE];
     
-    let vdm_rsp_size = 12 + *tdisp_rsp_size_ref;
+    let vdm_rsp_size = 12 + *tdisp_rsp_size_ref + 1;
     let mut vdm_response: [u8; 12 + MAX_TDISP_SIZE] = [0; 12 + MAX_TDISP_SIZE];
     
     if tdisp_request_size > MAX_TDISP_SIZE || *tdisp_rsp_size_ref > MAX_TDISP_SIZE {
