@@ -254,6 +254,29 @@ fn pci_tdisp_send_receive_vdm(
         &mut actual_rsp_size,
     );
     
+    unsafe {
+        printf(b"[RUST-TDISP] VDM response: status=%u actual_rsp_size=%zu\n\0".as_ptr() as *const i8, status as u32, actual_rsp_size);
+        fflush(0 as *mut core::ffi::c_void);
+        
+        // Check if we got enough bytes for DOE header + TDISP header
+        if actual_rsp_size >= 14 {
+            let tdisp_version = vdm_response[12];
+            let tdisp_msg_type = vdm_response[13];
+            printf(b"[RUST-TDISP] TDISP rsp: version=0x%x msg_type=0x%x\n\0".as_ptr() as *const i8,
+                   tdisp_version as u32, tdisp_msg_type as u32);
+            fflush(0 as *mut core::ffi::c_void);
+            
+            // If it's an error (0x7F), dump more details
+            if tdisp_msg_type == 0x7f {
+                if actual_rsp_size >= 16 {
+                    let error_code = vdm_response[14];
+                    printf(b"[RUST-TDISP] TDISP ERROR: error_code=0x%x\n\0".as_ptr() as *const i8, error_code as u32);
+                    fflush(0 as *mut core::ffi::c_void);
+                }
+            }
+        }
+    }
+    
     if status != LIBSPDM_STATUS_SUCCESS {
         debug_print!("TDISP VDM: send_receive_data failed");
         return status;
@@ -483,7 +506,7 @@ pub extern "C" fn pci_tdisp_lock_interface(
         core::ptr::copy_nonoverlapping(
             lock_interface_param as *const u8,
             req_ptr.add(16),
-            16,
+            20,  // pci_tdisp_lock_interface_param_t is 20 bytes (flags:2 + stream_id:1 + reserved:1 + mmio_offset:8 + bind_p2p:8)
         );
     }
     
@@ -495,7 +518,7 @@ pub extern "C" fn pci_tdisp_lock_interface(
         session_id,
         PCI_TDISP_LOCK_INTERFACE_REQ,
         &request as *const PciTdispLockInterfaceRequest as *const u8,
-        32,
+        36,  // header(16) + lock_interface_param(20) = 36 bytes
         &mut response as *mut PciTdispLockInterfaceResponse as *mut u8,
         &mut rsp_size,
     );
