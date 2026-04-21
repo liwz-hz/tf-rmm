@@ -170,13 +170,13 @@ Fake_host platform: `plat/host/`
 - `host_build/src/host_setup.c`: Process launch and main entry
 - `runtime/rmi/pdev.c`: PDEV creation with SPDM-only flags
 
-## Debugging Status (2026-04-20)
+## Debugging Status (2026-04-21)
 
 ### Session: Rust Library Full Replacement - COMPLETE
 
 **Goal**: 实现 rust-spdm-minimal 完全替换 libspdm C 库
 
-**Status**: ✅ **COMPLETE** - Rust library fully replaces C library
+**Status**: ✅ **COMPLETE** - Rust library fully replaces C library, all stages pass with exit code 0
 
 ### All Completed Fixes
 
@@ -187,16 +187,27 @@ Fake_host platform: `plat/host/`
 5. ✓ TH1 transcript storage fix: Save request bytes before `recv()`
 6. ✓ **Transport_encode parameters fix (commit a725a0f)**: Pass correct SPDM message pointer and buffer capacity
 7. ✓ **TDISP stub functions implementation (commit a366a9c)**: Full TDISP protocol compliance
+8. ✓ **AES-256-GCM encryption/decryption (commit 8bd2e8f)**: Full secured message implementation
+9. ✓ **Transport_decode buffer capacity fix (commit c544e29)**: Initialize decoded_size to 4096 instead of 0
 
-### Latest Fix: TDISP Stub Functions Implementation (a366a9c)
+### Latest Fix: Transport_decode Buffer Capacity (c544e29)
 
-**Problem**: 3 TDISP functions were stubs returning SUCCESS without sending messages
-**Root Cause**: `pci_tdisp_get_version`, `pci_tdisp_get_capabilities`, `pci_tdisp_lock_interface` were placeholder stubs
+**Problem**: TDISP secured messages failed decryption with "buffer too small (cap=0, need=6)"
+**Root Cause**: `decoded_size` was initialized to 0, but C's `libspdm_decode_secured_message` expects buffer capacity
 **Fix**: 
-- Add proper request/response structures for VERSION, CAPABILITIES, LOCK_INTERFACE
-- Implement each function to send actual TDISP VDM via `pci_tdisp_send_receive_vdm()`
-- Validate responses and extract data (version number, capabilities, nonce)
-- Use pointer arithmetic for packed struct field access
+- Initialize `decoded_size = 4096` in `libspdm_send_receive_data`
+- Initialize `msg_size = 4096` for CERTIFICATE and KEY_EXCHANGE decode calls
+- This matches C's pattern where scratch buffer capacity is passed before decode
+
+### Verified Working (2026-04-21)
+
+| Test | Rust Library | C Library |
+|------|-------------|-----------|
+| Stage 1-5 (PDEV, Realm) | ✓ PASS | ✓ PASS |
+| Stage 6 (TDISP Lock/Start) | ✓ PASS | ✓ PASS |
+| VDEV_UNLOCK | ✓ RMI_SUCCESS | ✓ RMI_SUCCESS |
+| REALM_DESTROY | ✓ RMI_SUCCESS | ✓ RMI_SUCCESS |
+| Exit Code | 0 | 0 |
 
 ### Verified Working
 
