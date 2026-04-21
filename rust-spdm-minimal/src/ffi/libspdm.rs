@@ -2114,8 +2114,10 @@ match keypair.shared_secret(&responder_sec1_pubkey) {
                             for i in 0..signature_len.min(128) {
                                 transcript_data.push(SPDM_CTX.key_exchange_rsp_data[rsp_no_sig_len + i].load(Ordering::SeqCst));
                             }
-                            debug_print!("  TH1 transcript: msg_a=%zu + cert_hash=%zu + ke_req=%zu + ke_rsp=%zu", 
-                                         msg_a_len, cert_hash_len, req_len, rsp_no_sig_len + signature_len);
+                            // TH1 transcript ends here - responder HMAC is NOT included
+                            // Responder calculates TH1 BEFORE appending HMAC (libspdm_rsp_key_exchange.c line 601)
+                            debug_print!("  TH1 transcript: msg_a=%zu + cert_hash=%zu + ke_req=%zu + ke_rsp(no_sig=%zu) + sig=96", 
+                                         msg_a_len, cert_hash_len, req_len, rsp_no_sig_len);
                             
                             let th1 = match sha384(&transcript_data) {
                                 Ok(h) => {
@@ -2462,6 +2464,15 @@ pub extern "C" fn libspdm_finish(
         }
         offset += hash_size;
         
+        // Save FINISH request bytes for TH2 calculation (header + verify_data)
+        let finish_req_size = 4 + hash_size;  // header + HMAC
+        for i in 0..finish_req_size.min(128) {
+            let byte = unsafe { *sender_buf.add(i) };
+            SPDM_CTX.finish_req_data[i].store(byte, Ordering::SeqCst);
+        }
+        SPDM_CTX.finish_req_len.store(finish_req_size as u32, Ordering::SeqCst);
+        debug_print!("  saved FINISH request: len=%zu", finish_req_size);
+        
         debug_print!("  sending FINISH: size=%zu (header=4 + hmac=%zu)", req_size, hash_size);
         
         let send_ret = call_send(context, sender_buf, req_size);
@@ -2505,6 +2516,14 @@ pub extern "C" fn libspdm_finish(
             return LIBSPDM_STATUS_ERROR;
         }
         
+        // Save FINISH response bytes for TH2 calculation (header + verify_data)
+        for i in 0..recv_size.min(64) {
+            let byte = unsafe { *receiver_buf.add(i) };
+            SPDM_CTX.finish_rsp_data[i].store(byte, Ordering::SeqCst);
+        }
+        SPDM_CTX.finish_rsp_len.store(recv_size as u32, Ordering::SeqCst);
+        debug_print!("  saved FINISH response: len=%zu", recv_size);
+        
         call_release_receiver(context, receiver_buf as *mut c_void);
         
         // Derive application_secret keys for ESTABLISHED session state
@@ -2530,17 +2549,20 @@ pub extern "C" fn libspdm_finish(
             b'd', b'e', b'r', b'i', b'v', b'e', b'd',
         ].to_vec();
         let salt1 = match hkdf_expand_sha384(&handshake_secret, &bin_str0, 48) {
-            Ok(s) => s,
+            Ok(s) => {
+                debug_print!("  salt1 first bytes: %02x%02x%02x%02x", s[0], s[1], s[2], s[3]);
+                s
+            },
             Err(_) => {
                 debug_print!("  ERROR: salt1 derivation failed");
                 return LIBSPDM_STATUS_CRYPTO_ERROR;
             }
         };
-        debug_print!("  derived salt1");
         
-        // master_secret = HKDF-Extract(zero, salt1)
+        // master_secret = HKDF-Extract(zero, salt1) per SPDM spec
+        // Note: libspdm_hkdf_extract(ikm, salt) - ikm first, salt second!
         let zero_salt = [0u8; 48];
-        let master_secret = match hkdf_extract_sha384(&zero_salt, &salt1) {
+        let master_secret = match hkdf_extract_sha384(&salt1, &zero_salt) {
             Ok(ms) => ms,
             Err(_) => {
                 debug_print!("  ERROR: master_secret derivation failed");
@@ -2550,18 +2572,95 @@ pub extern "C" fn libspdm_finish(
         for i in 0..48 {
             SPDM_CTX.master_secret[i].store(master_secret[i], Ordering::SeqCst);
         }
-        debug_print!("  stored master_secret");
+        debug_print!("  master_secret first bytes: %02x%02x%02x%02x", master_secret[0], master_secret[1], master_secret[2], master_secret[3]);
         
-        // TH2 hash = SHA-384(message_a + cert_chain_hash + KE_req + KE_rsp + FINISH_req + FINISH_rsp)
-        // For simplicity, use TH1 as TH2 approximation (same transcript before FINISH)
-        let th2 = match sha384(&transcript_data) {
-            Ok(h) => h,
+        // TH2 transcript = TH1 transcript + message_f
+        // TH1 = message_a + cert_chain_hash + message_k (KE_req + KE_rsp(no_sig) + signature)
+        // message_k does NOT include responder HMAC (TH1 calculated before HMAC appended)
+        // message_f = FINISH_req (header + verify_data) + FINISH_rsp (header + verify_data if handshake_in_clear)
+        
+        let msg_a_len = SPDM_CTX.message_a_len.load(Ordering::SeqCst) as usize;
+        let cert_hash_len = SPDM_CTX.cert_chain_hash_len.load(Ordering::SeqCst) as usize;
+        let ke_req_len = SPDM_CTX.key_exchange_req_len.load(Ordering::SeqCst) as usize;
+        let ke_rsp_len = SPDM_CTX.key_exchange_rsp_len.load(Ordering::SeqCst) as usize;
+        let finish_req_len = SPDM_CTX.finish_req_len.load(Ordering::SeqCst) as usize;
+        let finish_rsp_len = SPDM_CTX.finish_rsp_len.load(Ordering::SeqCst) as usize;
+        
+        // TH1 transcript = message_a + cert_hash + ke_req + ke_rsp(no_sig) + signature
+        // rsp_no_sig_len = ke_rsp_len - signature (96), NOT subtracting HMAC
+        // HMAC is appended separately after TH1 base if handshake_in_clear is false
+        let rsp_no_sig_len = if ke_rsp_len >= 96 { ke_rsp_len - 96 } else { ke_rsp_len };
+        let mut th2_transcript = Vec::with_capacity(msg_a_len + cert_hash_len + ke_req_len + rsp_no_sig_len + 96 + finish_req_len + finish_rsp_len);
+        
+        for i in 0..msg_a_len.min(4096) {
+            th2_transcript.push(SPDM_CTX.message_a_data[i].load(Ordering::SeqCst));
+        }
+        for i in 0..cert_hash_len.min(64) {
+            th2_transcript.push(SPDM_CTX.cert_chain_hash[i].load(Ordering::SeqCst));
+        }
+        for i in 0..ke_req_len.min(2048) {
+            th2_transcript.push(SPDM_CTX.key_exchange_req_data[i].load(Ordering::SeqCst));
+        }
+        for i in 0..rsp_no_sig_len.min(2048) {
+            th2_transcript.push(SPDM_CTX.key_exchange_rsp_data[i].load(Ordering::SeqCst));
+        }
+        for i in 0..96.min(128) {
+            if rsp_no_sig_len + i < 2048 {
+                th2_transcript.push(SPDM_CTX.key_exchange_rsp_data[rsp_no_sig_len + i].load(Ordering::SeqCst));
+            }
+        }
+        debug_print!("  TH1 base: msg_a=%zu cert=%zu ke_req=%zu ke_rsp(no_sig)=%zu sig=96", 
+                     msg_a_len, cert_hash_len, ke_req_len, rsp_no_sig_len);
+        
+        // Append responder HMAC from KEY_EXCHANGE - ONLY if HANDSHAKE_IN_THE_CLEAR is NOT enabled
+        // Responder appends HMAC to message_k AFTER TH1 calculation (libspdm_rsp_key_exchange.c line 633)
+        // TH2 includes full message_k buffer which contains the HMAC
+        let cap_flags = SPDM_CTX.cap_flags.load(Ordering::SeqCst);
+        let handshake_in_clear = (cap_flags & 0x8000) != 0;
+        let hmac_len = SPDM_CTX.responder_hmac_len.load(Ordering::SeqCst) as usize;
+        if !handshake_in_clear && hmac_len > 0 {
+            for i in 0..hmac_len.min(48) {
+                th2_transcript.push(SPDM_CTX.responder_hmac[i].load(Ordering::SeqCst));
+            }
+            debug_print!("  appended responder HMAC to TH2: len=%zu (handshake NOT in clear)", hmac_len);
+        } else {
+            debug_print!("  skipped responder HMAC for TH2: handshake_in_clear=%u", handshake_in_clear as u32);
+        }
+        
+        // Append message_f: FINISH request HEADER only (4 bytes per libspdm_rsp_finish.c line 526)
+        for i in 0..4.min(finish_req_len) {
+            th2_transcript.push(SPDM_CTX.finish_req_data[i].load(Ordering::SeqCst));
+        }
+        debug_print!("  appended FINISH req header: 4 bytes");
+        
+        // Append message_f: Request HMAC (verify_data after header)
+        // Responder line 584: append request HMAC
+        for i in 4..finish_req_len.min(128) {
+            th2_transcript.push(SPDM_CTX.finish_req_data[i].load(Ordering::SeqCst));
+        }
+        debug_print!("  appended FINISH req HMAC: %zu bytes", finish_req_len - 4);
+        
+        // Append message_f: FINISH response (header + verify_data if HANDSHAKE_IN_THE_CLEAR)
+        let cap_flags = SPDM_CTX.cap_flags.load(Ordering::SeqCst);
+        let handshake_in_clear = (cap_flags & 0x8000) != 0;
+        let finish_rsp_msg_size = if handshake_in_clear { finish_rsp_len } else { 4 };
+        for i in 0..finish_rsp_msg_size.min(64) {
+            th2_transcript.push(SPDM_CTX.finish_rsp_data[i].load(Ordering::SeqCst));
+        }
+        debug_print!("  appended FINISH rsp: %u bytes (handshake_in_clear=%u)", finish_rsp_msg_size, handshake_in_clear as u32);
+        
+        debug_print!("  TH2 transcript total: %zu bytes", th2_transcript.len());
+        
+        let th2 = match sha384(&th2_transcript) {
+            Ok(h) => {
+                debug_print!("  TH2 hash first bytes: %02x%02x%02x%02x", h[0], h[1], h[2], h[3]);
+                h
+            },
             Err(_) => {
                 debug_print!("  ERROR: TH2 hash failed");
                 return LIBSPDM_STATUS_CRYPTO_ERROR;
             }
         };
-        debug_print!("  computed TH2");
         
         // request_data_secret = HKDF-Expand(master_secret, "spdm1.x req app data" + TH2, 48)
         let bin_str3: Vec<u8> = [
@@ -2573,13 +2672,15 @@ pub extern "C" fn libspdm_finish(
             b'd', b'a', b't', b'a',
         ].iter().cloned().chain(th2.iter().cloned()).collect();
         let req_data_secret = match hkdf_expand_sha384(&master_secret, &bin_str3, 48) {
-            Ok(s) => s,
+            Ok(s) => {
+                debug_print!("  request_data_secret first bytes: %02x%02x%02x%02x", s[0], s[1], s[2], s[3]);
+                s
+            },
             Err(_) => {
                 debug_print!("  ERROR: request_data_secret derivation failed");
                 return LIBSPDM_STATUS_CRYPTO_ERROR;
             }
         };
-        debug_print!("  derived request_data_secret");
         
         // Derive request_data_encryption_key = HKDF-Expand(req_data_secret, "spdm1.x key", 32)
         let bin_str5_req: Vec<u8> = [
@@ -2781,16 +2882,21 @@ pub extern "C" fn libspdm_encode_secured_message(
     secured_message_size: *mut usize,
     secured_message: *mut u8,
 ) -> libspdm_return_t {
-    debug_print!("encode_secured_msg(session=0x%x, req=%u, msg_size=%zu)", session_id, is_request_message as u32, message_size);
-    
     if message.is_null() || secured_message.is_null() || secured_message_size.is_null() {
         return LIBSPDM_STATUS_ERROR;
     }
     
     let buffer_capacity = unsafe { *secured_message_size };
     let aead_tag_size = 16;
-    let header_size = 6;
-    let required_size = header_size + message_size + aead_tag_size;
+    let cipher_header_size = 2;  // application_data_length field (uint16_t)
+    let header_size = 6;  // session_id (4) + length (2)
+    // C's length = cipher_text_size + tag = (cipher_header_size + app_size) + tag
+    let cipher_text_size = cipher_header_size + message_size;
+    let payload_length = (cipher_text_size + aead_tag_size) as u16;  // This is record_header2->length
+    let required_size = header_size + cipher_text_size + aead_tag_size;
+    
+    debug_print!("encode_secured_msg(session=0x%x, req=%u, msg_size=%zu, payload_len=%u)", 
+                 session_id, is_request_message as u32, message_size, payload_length);
     
     if buffer_capacity < required_size {
         debug_print!("  ERROR: buffer too small (cap=%zu, need=%zu)", buffer_capacity, required_size);
@@ -2873,18 +2979,25 @@ pub extern "C" fn libspdm_encode_secured_message(
             iv[i] ^= seq_bytes[i];
         }
         
-        let seq_header = (seq_num as u16).to_le_bytes();
+        // AAD = session_id (4 bytes) + length (2 bytes)
+        let length_bytes = payload_length.to_le_bytes();
         let aad: Vec<u8> = [
             (session_id & 0xFF) as u8,
             ((session_id >> 8) & 0xFF) as u8,
             ((session_id >> 16) & 0xFF) as u8,
             ((session_id >> 24) & 0xFF) as u8,
-            seq_header[0], seq_header[1],
+            length_bytes[0], length_bytes[1],
         ].to_vec();
         
-        let plaintext = core::slice::from_raw_parts(message, message_size);
+        // plaintext = application_data_length (2 bytes) + message
+        let app_len_bytes = (message_size as u16).to_le_bytes();
+        let message_bytes = core::slice::from_raw_parts(message, message_size);
+        let plaintext: Vec<u8> = [app_len_bytes[0], app_len_bytes[1]].iter()
+            .chain(message_bytes.iter())
+            .cloned()
+            .collect();
         
-        let ciphertext = match aes256_gcm_encrypt(&enc_key, &iv, &aad, plaintext) {
+        let ciphertext = match aes256_gcm_encrypt(&enc_key, &iv, &aad, &plaintext) {
             Ok(ct) => ct,
             Err(_) => {
                 debug_print!("  ERROR: AES-GCM encryption failed");
@@ -2892,17 +3005,22 @@ pub extern "C" fn libspdm_encode_secured_message(
             }
         };
         
-        debug_print!("  ciphertext len=%zu (plaintext=%zu + tag=%zu)", ciphertext.len(), message_size, aead_tag_size);
+        debug_print!("  ciphertext len=%zu (enc=%zu + tag=%zu)", ciphertext.len(), cipher_text_size, aead_tag_size);
         
         let output = core::slice::from_raw_parts_mut(secured_message, required_size);
         
+        // Header: session_id (4 bytes) + length (2 bytes)
         output[0] = (session_id & 0xFF) as u8;
         output[1] = ((session_id >> 8) & 0xFF) as u8;
         output[2] = ((session_id >> 16) & 0xFF) as u8;
         output[3] = ((session_id >> 24) & 0xFF) as u8;
-        output[4] = seq_header[0];
-        output[5] = seq_header[1];
-        output[header_size..required_size].copy_from_slice(&ciphertext);
+        output[4] = length_bytes[0];
+        output[5] = length_bytes[1];
+        
+        // Ciphertext (without tag) after header
+        output[header_size..header_size + cipher_text_size].copy_from_slice(&ciphertext[..cipher_text_size]);
+        // Tag after ciphertext
+        output[header_size + cipher_text_size..required_size].copy_from_slice(&ciphertext[cipher_text_size..]);
         
         *secured_message_size = required_size;
         
@@ -2928,10 +3046,11 @@ pub extern "C" fn libspdm_decode_secured_message(
         return LIBSPDM_STATUS_ERROR;
     }
     
-    let header_size = 6;
+    let header_size = 6;  // session_id (4 bytes) + length (2 bytes)
     let aead_tag_size = 16;
+    let cipher_header_size = 2;  // application_data_length field
     
-    if secured_message_size < header_size + aead_tag_size {
+    if secured_message_size < header_size + cipher_header_size + aead_tag_size {
         debug_print!("  ERROR: secured message too small");
         return LIBSPDM_STATUS_INVALID_MSG_FIELD;
     }
@@ -2945,13 +3064,34 @@ pub extern "C" fn libspdm_decode_secured_message(
             return LIBSPDM_STATUS_INVALID_MSG_FIELD;
         }
         
-        let seq_num = u16::from_le_bytes([secured[4], secured[5]]) as u64;
+        // Read length field (2 bytes at offset 4) = cipher_text_size + aead_tag_size
+        let payload_length = u16::from_le_bytes([secured[4], secured[5]]) as usize;
+        let cipher_text_size = payload_length - aead_tag_size;
         
-        let plaintext_size = secured_message_size - header_size - aead_tag_size;
+        // Sequence number NOT in header, use stored value for IV generation
+        let seq_num: u64;
+        let session_state = SPDM_CTX.session_state.load(Ordering::SeqCst);
+        if session_state == LIBSPDM_SESSION_STATE_ESTABLISHED {
+            if is_request_message {
+                seq_num = SPDM_CTX.request_data_sequence_number.load(Ordering::SeqCst);
+            } else {
+                seq_num = SPDM_CTX.response_data_sequence_number.load(Ordering::SeqCst);
+            }
+        } else {
+            if is_request_message {
+                seq_num = SPDM_CTX.request_handshake_sequence_number.load(Ordering::SeqCst);
+            } else {
+                seq_num = SPDM_CTX.response_handshake_sequence_number.load(Ordering::SeqCst);
+            }
+        }
+        
+        // plaintext (decrypted) = cipher_header (2 bytes) + app_data
+        // app_data_size = cipher_text_size - cipher_header_size
+        let app_data_size = cipher_text_size - cipher_header_size;
         let buffer_capacity = *message_size;
         
-        if buffer_capacity < plaintext_size {
-            debug_print!("  ERROR: buffer too small (cap=%zu, need=%zu)", buffer_capacity, plaintext_size);
+        if buffer_capacity < app_data_size {
+            debug_print!("  ERROR: buffer too small (cap=%zu, need=%zu)", buffer_capacity, app_data_size);
             return LIBSPDM_STATUS_BUFFER_TOO_SMALL;
         }
         
@@ -3010,13 +3150,14 @@ pub extern "C" fn libspdm_decode_secured_message(
             iv[i] ^= seq_bytes[i];
         }
         
-        let seq_header = (seq_num as u16).to_le_bytes();
+        // AAD = session_id (4 bytes) + length (2 bytes)
+        let length_bytes = (payload_length as u16).to_le_bytes();
         let aad: Vec<u8> = [
             (session_id & 0xFF) as u8,
             ((session_id >> 8) & 0xFF) as u8,
             ((session_id >> 16) & 0xFF) as u8,
             ((session_id >> 24) & 0xFF) as u8,
-            seq_header[0], seq_header[1],
+            length_bytes[0], length_bytes[1],
         ].to_vec();
         
         let ciphertext = &secured[header_size..secured_message_size];
@@ -3029,12 +3170,13 @@ pub extern "C" fn libspdm_decode_secured_message(
             }
         };
         
-        let output = core::slice::from_raw_parts_mut(message, plaintext_size);
-        output.copy_from_slice(&plaintext);
+        // Skip cipher_header (2 bytes) and copy app_data to output
+        let output = core::slice::from_raw_parts_mut(message, app_data_size);
+        output.copy_from_slice(&plaintext[cipher_header_size..]);
         
-        *message_size = plaintext.len();
+        *message_size = app_data_size;
         
-        debug_print!("  SUCCESS: plaintext_size=%zu", *message_size);
+        debug_print!("  SUCCESS: app_data_size=%zu", *message_size);
     }
     
     LIBSPDM_STATUS_SUCCESS
