@@ -373,7 +373,7 @@ libspdm_return_t libspdm_set_data(libspdm_context_t context,
                                   const void *data,
                                   uintptr_t data_size);
 
-libspdm_return_t libspdm_init_connection(libspdm_context_t context);
+libspdm_return_t libspdm_init_connection(libspdm_context_t context, bool get_version_only);
 
 libspdm_return_t libspdm_get_data(libspdm_context_t context,
                                   uint32_t data_type,

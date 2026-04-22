@@ -264,6 +264,79 @@ macro_rules! debug_print {
     };
 }
 
+/// Reset all SPDM context state - mirrors C's libspdm_reset_context
+/// This clears all connection state, session info, crypto keys, and transcripts
+fn reset_context() {
+    unsafe {
+        debug_print!("reset_context() - clearing all SPDM state");
+        
+        // Clear connection state (mirrors C's context->connection_info.connection_state)
+        SPDM_CTX.connection_state.store(LIBSPDM_CONNECTION_STATE_NOT_STARTED, Ordering::SeqCst);
+        
+        // Clear session info (mirrors C's libspdm_session_info_init with INVALID_SESSION_ID)
+        SPDM_CTX.session_id.store(0, Ordering::SeqCst);
+        SPDM_CTX.req_session_id.store(0, Ordering::SeqCst);
+        SPDM_CTX.rsp_session_id.store(0, Ordering::SeqCst);
+        SPDM_CTX.session_state.store(LIBSPDM_SESSION_STATE_NOT_STARTED, Ordering::SeqCst);
+        
+        // Clear all transcript data (mirrors C's libspdm_reset_message_a/b/c/d)
+        SPDM_CTX.message_a_len.store(0, Ordering::SeqCst);
+        SPDM_CTX.key_exchange_req_len.store(0, Ordering::SeqCst);
+        SPDM_CTX.key_exchange_rsp_len.store(0, Ordering::SeqCst);
+        SPDM_CTX.finish_req_len.store(0, Ordering::SeqCst);
+        SPDM_CTX.finish_rsp_len.store(0, Ordering::SeqCst);
+        SPDM_CTX.responder_hmac_len.store(0, Ordering::SeqCst);
+        
+        // Clear crypto secrets and keys (mirrors C's context clearing)
+        for i in 0..48 {
+            SPDM_CTX.handshake_secret[i].store(0, Ordering::SeqCst);
+            SPDM_CTX.transcript_hash[i].store(0, Ordering::SeqCst);
+            SPDM_CTX.request_handshake_secret[i].store(0, Ordering::SeqCst);
+            SPDM_CTX.request_finished_key[i].store(0, Ordering::SeqCst);
+            SPDM_CTX.response_handshake_secret[i].store(0, Ordering::SeqCst);
+            SPDM_CTX.response_finished_key[i].store(0, Ordering::SeqCst);
+            SPDM_CTX.responder_hmac[i].store(0, Ordering::SeqCst);
+            SPDM_CTX.master_secret[i].store(0, Ordering::SeqCst);
+        }
+        
+        // Clear encryption keys
+        for i in 0..32 {
+            SPDM_CTX.request_handshake_encryption_key[i].store(0, Ordering::SeqCst);
+            SPDM_CTX.response_handshake_encryption_key[i].store(0, Ordering::SeqCst);
+            SPDM_CTX.request_data_encryption_key[i].store(0, Ordering::SeqCst);
+            SPDM_CTX.response_data_encryption_key[i].store(0, Ordering::SeqCst);
+        }
+        
+        // Clear salts
+        for i in 0..12 {
+            SPDM_CTX.request_handshake_salt[i].store(0, Ordering::SeqCst);
+            SPDM_CTX.response_handshake_salt[i].store(0, Ordering::SeqCst);
+            SPDM_CTX.request_data_salt[i].store(0, Ordering::SeqCst);
+            SPDM_CTX.response_data_salt[i].store(0, Ordering::SeqCst);
+        }
+        
+        // Clear random data and DHE pubkey
+        for i in 0..32 {
+            SPDM_CTX.requester_random[i].store(0, Ordering::SeqCst);
+            SPDM_CTX.responder_random[i].store(0, Ordering::SeqCst);
+        }
+        for i in 0..96 {
+            SPDM_CTX.responder_dhe_pubkey[i].store(0, Ordering::SeqCst);
+        }
+        
+        // Clear sequence numbers (mirrors C's context reset)
+        SPDM_CTX.request_handshake_sequence_number.store(0, Ordering::SeqCst);
+        SPDM_CTX.response_handshake_sequence_number.store(0, Ordering::SeqCst);
+        SPDM_CTX.request_data_sequence_number.store(0, Ordering::SeqCst);
+        SPDM_CTX.response_data_sequence_number.store(0, Ordering::SeqCst);
+        
+        // Clear ECDH keypair (outside atomic context)
+        ECDH_KEYPAIR = None;
+        
+        debug_print!("reset_context() - all state cleared");
+    }
+}
+
 #[no_mangle]
 pub extern "C" fn libspdm_deinit_context(context: libspdm_context_t) -> libspdm_return_t {
     debug_print!("deinit_context(context=%p)", context);
@@ -722,53 +795,101 @@ unsafe {
 }
 
 #[no_mangle]
-pub extern "C" fn libspdm_init_connection(context: libspdm_context_t) -> libspdm_return_t {
-    debug_print!("init_connection(context=%p) - START", context);
-    
-    if context.is_null() {
-        debug_print!("  ERROR: context is NULL");
-        return LIBSPDM_STATUS_ERROR;
-    }
-
+pub extern "C" fn libspdm_init_connection(context: libspdm_context_t, get_version_only: bool) -> libspdm_return_t {
+    // All prints in single unsafe block to trace execution
     unsafe {
+        printf(b"[RUST-INIT] init_connection(context=%p, get_version_only=%u) START\n\0".as_ptr() as *const i8, 
+               context as *const c_void, get_version_only as u32);
+        fflush(0 as *mut core::ffi::c_void);
+        printf(b"[RUST-INIT] AFTER_START: checking context null\n\0".as_ptr() as *const i8);
+        fflush(0 as *mut core::ffi::c_void);
+        
+        if context.is_null() {
+            printf(b"[RUST-INIT] ERROR: context is NULL\n\0".as_ptr() as *const i8);
+            fflush(0 as *mut core::ffi::c_void);
+            return LIBSPDM_STATUS_ERROR;
+        }
+        printf(b"[RUST-INIT] STEP0: context OK, loading callbacks\n\0".as_ptr() as *const i8);
+        fflush(0 as *mut core::ffi::c_void);
         let send_ptr = SPDM_CTX.send_func.load(Ordering::SeqCst);
         let recv_ptr = SPDM_CTX.recv_func.load(Ordering::SeqCst);
         let acq_send_ptr = SPDM_CTX.acquire_sender.load(Ordering::SeqCst);
         let acq_recv_ptr = SPDM_CTX.acquire_receiver.load(Ordering::SeqCst);
         
-        debug_print!("  send=%p, recv=%p, acq_send=%p, acq_recv=%p", send_ptr, recv_ptr, acq_send_ptr, acq_recv_ptr);
+        printf(b"[RUST-INIT] STEP2: send=%p recv=%p acq_send=%p acq_recv=%p\n\0".as_ptr() as *const i8,
+               send_ptr as *const c_void, recv_ptr as *const c_void, 
+               acq_send_ptr as *const c_void, acq_recv_ptr as *const c_void);
+        fflush(0 as *mut core::ffi::c_void);
         
         if send_ptr.is_null() || recv_ptr.is_null() || acq_send_ptr.is_null() || acq_recv_ptr.is_null() {
-            debug_print!("  ERROR: callbacks not registered");
+            printf(b"[RUST-INIT] ERROR: callbacks not registered\n\0".as_ptr() as *const i8);
+            fflush(0 as *mut core::ffi::c_void);
             return LIBSPDM_STATUS_ERROR;
         }
 
+        printf(b"[RUST-INIT] STEP3: acquiring sender buffer\n\0".as_ptr() as *const i8);
+        fflush(0 as *mut core::ffi::c_void);
         let sender_buf = call_acquire_sender(context);
         if sender_buf.is_null() {
-            debug_print!("  ERROR: failed to acquire sender buffer");
+            printf(b"[RUST-INIT] ERROR: failed to acquire sender buffer\n\0".as_ptr() as *const i8);
+            fflush(0 as *mut core::ffi::c_void);
             return LIBSPDM_STATUS_ERROR;
         }
+        printf(b"[RUST-INIT] STEP4: sender_buf=%p\n\0".as_ptr() as *const i8, sender_buf as *const c_void);
+        fflush(0 as *mut core::ffi::c_void);
 
-        // Clear message_a transcript at start
-        SPDM_CTX.message_a_len.store(0, Ordering::SeqCst);
+        // Reset all SPDM context state before GET_VERSION (mirrors C's libspdm_reset_context)
+        printf(b"[RUST-INIT] STEP5: calling reset_context()\n\0".as_ptr() as *const i8);
+        fflush(0 as *mut core::ffi::c_void);
+        reset_context();
+        printf(b"[RUST-INIT] STEP6: reset_context() returned\n\0".as_ptr() as *const i8);
+        fflush(0 as *mut core::ffi::c_void);
         
+        printf(b"[RUST-INIT] STEP7: loading spdm_version\n\0".as_ptr() as *const i8);
+        fflush(0 as *mut core::ffi::c_void);
         let negotiated_ver = SPDM_CTX.spdm_version.load(Ordering::SeqCst);
+        printf(b"[RUST-INIT] STEP8: negotiated_ver=0x%x, setting version_byte=0x10\n\0".as_ptr() as *const i8, negotiated_ver);
+        fflush(0 as *mut core::ffi::c_void);
         // GET_VERSION must always use version 1.0 (0x10), per SPDM spec
         let version_byte: u8 = 0x10;
-        debug_print!("  using SPDM version 0x%02x for GET_VERSION", version_byte as u32);
 
         // Write GET_VERSION request using pointer arithmetic
+        printf(b"[RUST-INIT] STEP9: writing GET_VERSION bytes to sender_buf\n\0".as_ptr() as *const i8);
+        fflush(0 as *mut core::ffi::c_void);
         *sender_buf.add(0) = version_byte;
         *sender_buf.add(1) = 0x84;
         *sender_buf.add(2) = 0x00;
         *sender_buf.add(3) = 0x00;
 
-        debug_print!("  sending GET_VERSION: %02x %02x %02x %02x", 
-                     *sender_buf.add(0) as u32, *sender_buf.add(1) as u32, 
-                     *sender_buf.add(2) as u32, *sender_buf.add(3) as u32);
+        // For GET_VERSION (unsecured), use transport_encode with NULL session_id
+        // This sets is_msg_sspdm=false in the C layer (critical after END_SESSION!)
+        printf(b"[RUST-INIT] STEP10: calling transport_encode(session=NULL, size=4)\n\0".as_ptr() as *const i8);
+        fflush(0 as *mut core::ffi::c_void);
+        let (encode_ret, transport_msg, transport_size) = call_transport_encode(
+            context,
+            core::ptr::null(), // session_id=NULL for unsecured GET_VERSION
+            sender_buf,         // SPDM message
+            4,                  // SPDM message size
+            sender_buf,         // Output transport buffer (same buffer)
+            4096,               // Buffer capacity
+        );
+        printf(b"[RUST-INIT] STEP11: transport_encode returned %u, size=%zu\n\0".as_ptr() as *const i8,
+               encode_ret, transport_size);
+        fflush(0 as *mut core::ffi::c_void);
         
-        let send_ret = call_send(context, sender_buf, 4);
-        debug_print!("  send returned %u", send_ret);
+        if encode_ret != LIBSPDM_STATUS_SUCCESS {
+            call_release_sender(context, sender_buf as *mut c_void);
+            printf(b"[RUST-INIT] ERROR: transport_encode failed\n\0".as_ptr() as *const i8);
+            fflush(0 as *mut core::ffi::c_void);
+            return LIBSPDM_STATUS_ERROR;
+        }
+
+        printf(b"[RUST-INIT] STEP12: calling call_send(context=%p buf=%p size=%zu)\n\0".as_ptr() as *const i8,
+               context as *const c_void, transport_msg as *const c_void, transport_size);
+        fflush(0 as *mut core::ffi::c_void);
+        let send_ret = call_send(context, transport_msg, transport_size);
+        printf(b"[RUST-INIT] STEP13: call_send returned %u\n\0".as_ptr() as *const i8, send_ret);
+        fflush(0 as *mut core::ffi::c_void);
         
         if send_ret != LIBSPDM_STATUS_SUCCESS {
             call_release_sender(context, sender_buf as *mut c_void);
@@ -834,6 +955,20 @@ pub extern "C" fn libspdm_init_connection(context: libspdm_context_t) -> libspdm
         }
         SPDM_CTX.message_a_len.store((msg_a_len + 4 + actual_rsp_size) as u32, Ordering::SeqCst);
         debug_print!("  saved VERSION to message_a: req=4, rsp=%zu, total=%zu", actual_rsp_size, msg_a_len + 4 + actual_rsp_size);
+        
+        // CRITICAL: Call transport_decode to trigger caching callbacks that clear spdm_request_len
+        // Without this, the saved GET_VERSION request would be incorrectly cached with later responses
+        debug_print!("  BEFORE call_transport_decode for VERSION response");
+        let mut decode_msg_size: usize = 4096;
+        let mut decode_msg_ptr: *mut c_void = core::ptr::null_mut();
+        let decode_ret = call_transport_decode(
+            context,
+            receiver_buf as *mut c_void,
+            recv_size,
+            &mut decode_msg_size,
+            &mut decode_msg_ptr,
+        );
+        debug_print!("  AFTER call_transport_decode for VERSION: ret=%u", decode_ret);
         
         call_release_sender(context, sender_buf as *mut c_void);
         call_release_receiver(context, receiver_buf as *mut c_void);
@@ -903,6 +1038,11 @@ pub extern "C" fn libspdm_init_connection(context: libspdm_context_t) -> libspdm
         SPDM_CTX.connection_state.store(LIBSPDM_CONNECTION_STATE_AFTER_VERSION, Ordering::SeqCst);
         debug_print!("  connection_state -> AFTER_VERSION");
         
+        if get_version_only {
+            debug_print!("  get_version_only=true, skipping CAPABILITIES/ALGORITHMS");
+            return LIBSPDM_STATUS_SUCCESS;
+        }
+
 // Now send GET_CAPABILITIES using negotiated version
         // GET_CAPABILITIES request format (SPDM 1.2): 20 bytes total
         // header(4) + reserved(1) + ct_exponent(1) + reserved2(2) + flags(4) + data_transfer_size(4) + max_spdm_msg_size(4)
@@ -992,6 +1132,19 @@ pub extern "C" fn libspdm_init_connection(context: libspdm_context_t) -> libspdm
         }
         SPDM_CTX.message_a_len.store((msg_a_len_before_caps + caps_req_size + recv_size2) as u32, Ordering::SeqCst);
         debug_print!("  saved CAPABILITIES to message_a: req=%zu, rsp=%zu, total=%zu", caps_req_size, recv_size2, msg_a_len_before_caps + caps_req_size + recv_size2);
+        
+        // CRITICAL: Call transport_decode to trigger caching callbacks
+        debug_print!("  BEFORE call_transport_decode for CAPABILITIES response");
+        let mut decode_msg_size2: usize = 4096;
+        let mut decode_msg_ptr2: *mut c_void = core::ptr::null_mut();
+        let decode_ret2 = call_transport_decode(
+            context,
+            receiver_buf2 as *mut c_void,
+            recv_size2,
+            &mut decode_msg_size2,
+            &mut decode_msg_ptr2,
+        );
+        debug_print!("  AFTER call_transport_decode for CAPABILITIES: ret=%u", decode_ret2);
         
         call_release_sender(context, sender_buf2 as *mut c_void);
         call_release_receiver(context, receiver_buf2 as *mut c_void);
@@ -1167,6 +1320,19 @@ pub extern "C" fn libspdm_init_connection(context: libspdm_context_t) -> libspdm
         }
         SPDM_CTX.message_a_len.store((msg_a_len_before_alg + alg_req_size + recv_size3) as u32, Ordering::SeqCst);
         debug_print!("  saved ALGORITHMS to message_a: req=%zu, rsp=%zu, total=%zu", alg_req_size, recv_size3, msg_a_len_before_alg + alg_req_size + recv_size3);
+        
+        // CRITICAL: Call transport_decode to trigger caching callbacks
+        debug_print!("  BEFORE call_transport_decode for ALGORITHMS response");
+        let mut decode_msg_size3: usize = 4096;
+        let mut decode_msg_ptr3: *mut c_void = core::ptr::null_mut();
+        let decode_ret3 = call_transport_decode(
+            context,
+            receiver_buf3 as *mut c_void,
+            recv_size3,
+            &mut decode_msg_size3,
+            &mut decode_msg_ptr3,
+        );
+        debug_print!("  AFTER call_transport_decode for ALGORITHMS: ret=%u", decode_ret3);
         
         call_release_sender(context, sender_buf3 as *mut c_void);
         call_release_receiver(context, receiver_buf3 as *mut c_void);
