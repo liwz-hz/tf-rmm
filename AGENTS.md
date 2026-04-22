@@ -170,7 +170,7 @@ Fake_host platform: `plat/host/`
 - `host_build/src/host_setup.c`: Process launch and main entry
 - `runtime/rmi/pdev.c`: PDEV creation with SPDM-only flags
 
-## Debugging Status (2026-04-21)
+## Debugging Status (2026-04-22)
 
 ### Session: Rust Library Full Replacement - COMPLETE
 
@@ -189,17 +189,25 @@ Fake_host platform: `plat/host/`
 7. ✓ **TDISP stub functions implementation (commit a366a9c)**: Full TDISP protocol compliance
 8. ✓ **AES-256-GCM encryption/decryption (commit 8bd2e8f)**: Full secured message implementation
 9. ✓ **Transport_decode buffer capacity fix (commit c544e29)**: Initialize decoded_size to 4096 instead of 0
+10. ✓ **init_connection transport_decode fix (commit c9c812e)**: Clear spdm_request_len to prevent cert_chain corruption
 
-### Latest Fix: Transport_decode Buffer Capacity (c544e29)
+### Latest Fix: init_connection transport_decode (c9c812e)
 
-**Problem**: TDISP secured messages failed decryption with "buffer too small (cap=0, need=6)"
-**Root Cause**: `decoded_size` was initialized to 0, but C's `libspdm_decode_secured_message` expects buffer capacity
-**Fix**: 
-- Initialize `decoded_size = 4096` in `libspdm_send_receive_data`
-- Initialize `msg_size = 4096` for CERTIFICATE and KEY_EXCHANGE decode calls
-- This matches C's pattern where scratch buffer capacity is passed before decode
+**Problem**: cert_chain corrupted, causing "Get public key failed (cert_len=1543)"
+**Root Cause**: Rust's `init_connection` did NOT call `transport_decode` after responses:
+- `transport_encode` saves requests (sets `spdm_request_len`)
+- `transport_decode` triggers caching callbacks that clear `spdm_request_len`
+- Without decode calls, `spdm_request_len` remained set
+- First CERTIFICATE response cached wrong GET_VERSION request (4 bytes) alongside cert
 
-### Verified Working (2026-04-21)
+**Fix**: Added `call_transport_decode` after each response in `init_connection`:
+- VERSION response → triggers `dev_assign_cache_versions_rsp`
+- CAPABILITIES response → triggers `dev_assign_cache_capabilities_rsp`
+- ALGORITHMS response → triggers `dev_assign_cache_algorithms_rsp`
+
+**Result**: cert_chain_len=1539 (correct), public key extraction succeeds, exit code 0
+
+### Verified Working (2026-04-22)
 
 | Test | Rust Library | C Library |
 |------|-------------|-----------|
@@ -207,16 +215,9 @@ Fake_host platform: `plat/host/`
 | Stage 6 (TDISP Lock/Start) | ✓ PASS | ✓ PASS |
 | VDEV_UNLOCK | ✓ RMI_SUCCESS | ✓ RMI_SUCCESS |
 | REALM_DESTROY | ✓ RMI_SUCCESS | ✓ RMI_SUCCESS |
+| PDEV_DESTROY | ✓ RMI_SUCCESS | ✓ RMI_SUCCESS |
 | Exit Code | 0 | 0 |
-
-### Verified Working
-
-| Test | Rust Library | C Library |
-|------|-------------|-----------|
-| Stage 1-5 (PDEV, Realm) | ✓ PASS | ✓ PASS |
-| Stage 6 (TDISP Lock/Start) | ✓ PASS | ✓ PASS |
-| Exit Code | 0 | 0 |
-| Secured TDISP VDM size | 52 bytes | 52 bytes |
+| cert_chain_len | 1539 | 1539 |
 
 ### Key Technical Insights
 
