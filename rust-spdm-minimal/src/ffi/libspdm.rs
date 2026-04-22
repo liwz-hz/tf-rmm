@@ -3448,9 +3448,14 @@ pub extern "C" fn libspdm_start_session(
 pub extern "C" fn libspdm_stop_session(
     context: libspdm_context_t,
     session_id: libspdm_session_id_t,
+    _end_session_attributes: u8,
 ) -> libspdm_return_t {
-    debug_print!("stop_session(context=%p, session=0x%x)", context, session_id);
-    LIBSPDM_STATUS_SUCCESS
+    // Placeholder - real implementation after libspdm_send_receive_data
+    unsafe {
+        printf(b"[RUST] stop_session(context=%p, session=0x%x)\n\0".as_ptr() as *const i8, context as *const c_void, session_id);
+        fflush(0 as *mut core::ffi::c_void);
+    }
+    libspdm_stop_session_impl(context, session_id)
 }
 
 #[no_mangle]
@@ -3683,4 +3688,50 @@ pub extern "C" fn libspdm_get_random_number(size: usize, rand: *mut u8) -> bool 
         }
     }
     true
+}
+
+fn libspdm_stop_session_impl(
+    context: libspdm_context_t,
+    session_id: libspdm_session_id_t,
+) -> libspdm_return_t {
+    if context.is_null() || session_id == 0 {
+        return LIBSPDM_STATUS_ERROR;
+    }
+    
+    let mut request: [u8; 4] = [0; 4];
+    request[0] = 0x12;
+    request[1] = 0xEC;
+    request[2] = 0;
+    request[3] = 0;
+    
+    let mut response: [u8; 64] = [0; 64];
+    let mut response_size = 64;
+    
+    let status = libspdm_send_receive_data(
+        context,
+        &session_id as *const u32,
+        false,
+        request.as_ptr(),
+        4,
+        response.as_mut_ptr(),
+        &mut response_size,
+    );
+    
+    unsafe {
+        printf(b"SPDM_END_SESSION completed: 0x%x\n\0".as_ptr() as *const i8, status as u32);
+        fflush(0 as *mut core::ffi::c_void);
+    }
+    
+    if status != LIBSPDM_STATUS_SUCCESS {
+        return status;
+    }
+    
+    if response_size >= 4 && response[1] == 0x6C {
+        unsafe {
+            SPDM_CTX.session_state.store(LIBSPDM_SESSION_STATE_NOT_STARTED, Ordering::SeqCst);
+        }
+        return LIBSPDM_STATUS_SUCCESS;
+    }
+    
+    LIBSPDM_STATUS_ERROR
 }

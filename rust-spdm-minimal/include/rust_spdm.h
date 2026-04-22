@@ -485,7 +485,9 @@ libspdm_return_t libspdm_start_session(libspdm_context_t context,
                                        uint8_t *heartbeat_period,
                                        void *measurement_hash);
 
-libspdm_return_t libspdm_stop_session(libspdm_context_t context, libspdm_session_id_t session_id);
+libspdm_return_t libspdm_stop_session(libspdm_context_t context,
+                                      libspdm_session_id_t session_id,
+                                      uint8_t _end_session_attributes);
 
 libspdm_return_t libspdm_send_receive_data(libspdm_context_t context,
                                            const libspdm_session_id_t *session_id,
