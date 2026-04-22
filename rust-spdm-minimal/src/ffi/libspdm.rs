@@ -3450,12 +3450,16 @@ pub extern "C" fn libspdm_stop_session(
     session_id: libspdm_session_id_t,
     _end_session_attributes: u8,
 ) -> libspdm_return_t {
-    // Placeholder - real implementation after libspdm_send_receive_data
     unsafe {
-        printf(b"[RUST] stop_session(context=%p, session=0x%x)\n\0".as_ptr() as *const i8, context as *const c_void, session_id);
+        printf(b"[RUST] stop_session(context=%p, session=0x%x) ENTRY\n\0".as_ptr() as *const i8, context as *const c_void, session_id);
         fflush(0 as *mut core::ffi::c_void);
     }
-    libspdm_stop_session_impl(context, session_id)
+    let result = libspdm_stop_session_impl(context, session_id);
+    unsafe {
+        printf(b"[RUST] stop_session EXIT: result=0x%x\n\0".as_ptr() as *const i8, result as u32);
+        fflush(0 as *mut core::ffi::c_void);
+    }
+    result
 }
 
 #[no_mangle]
@@ -3695,7 +3699,15 @@ fn libspdm_stop_session_impl(
     session_id: libspdm_session_id_t,
 ) -> libspdm_return_t {
     if context.is_null() || session_id == 0 {
+        unsafe {
+            printf(b"[RUST-STOP] ERROR: null context or session_id=0\n\0".as_ptr() as *const i8);
+        }
         return LIBSPDM_STATUS_ERROR;
+    }
+    
+    unsafe {
+        printf(b"[RUST-STOP] Building END_SESSION request\n\0".as_ptr() as *const i8);
+        fflush(0 as *mut core::ffi::c_void);
     }
     
     let mut request: [u8; 4] = [0; 4];
@@ -3706,6 +3718,11 @@ fn libspdm_stop_session_impl(
     
     let mut response: [u8; 64] = [0; 64];
     let mut response_size = 64;
+    
+    unsafe {
+        printf(b"[RUST-STOP] Calling libspdm_send_receive_data\n\0".as_ptr() as *const i8);
+        fflush(0 as *mut core::ffi::c_void);
+    }
     
     let status = libspdm_send_receive_data(
         context,
@@ -3718,20 +3735,30 @@ fn libspdm_stop_session_impl(
     );
     
     unsafe {
-        printf(b"SPDM_END_SESSION completed: 0x%x\n\0".as_ptr() as *const i8, status as u32);
+        printf(b"[RUST-STOP] send_receive_data returned: status=0x%x size=%zu\n\0".as_ptr() as *const i8, 
+               status as u32, response_size);
+        printf(b"[RUST-STOP] response bytes: %02x %02x %02x %02x\n\0".as_ptr() as *const i8,
+               response[0] as u32, response[1] as u32, response[2] as u32, response[3] as u32);
         fflush(0 as *mut core::ffi::c_void);
     }
     
     if status != LIBSPDM_STATUS_SUCCESS {
+        unsafe {
+            printf(b"[RUST-STOP] FAILED: status=0x%x\n\0".as_ptr() as *const i8, status as u32);
+        }
         return status;
     }
     
     if response_size >= 4 && response[1] == 0x6C {
         unsafe {
+            printf(b"[RUST-STOP] SUCCESS: END_SESSION_ACK received\n\0".as_ptr() as *const i8);
             SPDM_CTX.session_state.store(LIBSPDM_SESSION_STATE_NOT_STARTED, Ordering::SeqCst);
         }
         return LIBSPDM_STATUS_SUCCESS;
     }
     
+    unsafe {
+        printf(b"[RUST-STOP] ERROR: response[1]=0x%x (expected 0x6C)\n\0".as_ptr() as *const i8, response[1] as u32);
+    }
     LIBSPDM_STATUS_ERROR
 }
