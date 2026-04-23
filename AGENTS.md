@@ -1,86 +1,11 @@
-# TF-RMM Fakehost Debug Project
+# TF-RMM Rust SPDM Library Replacement Project
 
-## Purpose
-This repository is for **fake_host debugging** of tf-rmm. It is NOT a production build - IDE support was intentionally disabled to simplify SPDM testing (commit f11214a).
+## Project Overview
 
-## Build Commands
-**Always use the Python script - do NOT run cmake directly:**
+### Goal
+实现 `rust-spdm-minimal` 完全替换 tf-rmm 项目中的 libspdm C 库，使 Rust 版本能像 C 版本一样完整运行，包括所有 SPDM/TDISP 协议流程和 DESTROY 清理操作，最终 Exit code: 0。
 
-```bash
-python tfrmm.py build          # Build rmm.elf
-python tfrmm.py build --clean  # Clean rebuild
-python tfrmm.py run            # Run with SPDM responder
-python tfrmm.py all            # Full workflow: update, build, run
-```
-
-Build output: `build/Release/rmm.elf`
-
-## Submodules
-6 submodules required: mbedtls, qcbor, t_cose, cpputest, libspdm, spdm-emu
-- Run `python tfrmm.py submodule` or `git submodule update --init --recursive`
-
-## Configuration
-- Config: `host_defcfg` (fake_host architecture)
-- LOG_LEVEL set for verbose debug output
-
-## Critical Constraints
-**IDE is disabled** (commit f11214a):
-- `pdev.c`: Requires `NCOH_IDE=FALSE` (changed from TRUE)
-- `host_da.c`: SPDM only, no IDE flags
-- Do NOT "fix" IDE support - it's intentionally disabled for debugging
-
-## Build Output
-- `build/Release/rmm.elf` - RMM executable (linked with libspdm requester)
-- `build/Release/spdm_emu/spdm_responder_emu` - SPDM responder (auto-built from submodule)
-
-## SPDM Architecture
-
-### Two-Process Model
-The SPDM testing uses a **requester-responder split architecture**:
-
-| Component | Role | Location | Description |
-|-----------|------|----------|-------------|
-| `spdm_responder_emu` | Responder | `ext/spdm-emu/` | External process, simulates PCIe device |
-| `rmm.elf` (dev_assign app) | Requester | `app/device_assignment/` | Links libspdm requester library |
-
-### Startup Flow
-```
-main() → initialise_app_headers() → launch_spdm_responder_emu()
-                                    ↓
-                              fork() + execl()
-                                    ↓
-                         spdm_responder_emu --trans PCI_DOE
-                         (listening on TCP port 2323)
-```
-
-### Communication Path
-```
-rmm.elf (requester)          spdm_responder_emu (responder)
-       │                              │
-       │  host_spdm_rsp_ifc.c         │
-       │  (TCP socket)                │
-       └──────── DOE encapsulation ───┘
-              (port 2323)
-```
-
-### Key Files
-| File | Role |
-|------|------|
-| `plat/host/host_build/src/host_setup.c` | `launch_spdm_responder_emu()` - fork/exec startup |
-| `plat/host/host_build/src/host_spdm_rsp_ifc.c` | TCP socket + DOE protocol wrapper |
-| `app/device_assignment/el0_app/spdm_requester/CMakeLists.txt` | Links libspdm requester libs |
-| `app/device_assignment/el0_app/src/dev_assign_private.h` | Includes `spdm_requester_lib.h` |
-
-### libspdm Requester Libraries
-Linked into `rmm-app-dev-assign-elf`:
-- `spdm_requester_lib` - Core SPDM requester protocol
-- `spdm_secured_message_lib` - Secure session handling
-- `spdm_common_lib` / `spdm_crypt_lib` - Common/crypto support
-
-## TDISP Architecture
-
-### Library Dependency Chain
-TDISP protocol layer is built on top of libspdm:
+### Architecture
 
 ```
 ┌─────────────────────────────────────────────────────────────────┐
@@ -89,142 +14,395 @@ TDISP protocol layer is built on top of libspdm:
 │  │              rmm-app-dev-assign-elf                        │ │
 │  │       (Device Assignment EL0 App)                          │ │
 │  │                                                            │ │
-│  │   dev_tdisp_cmds.c                                         │ │
-│  │   └── pci_tdisp_lock_interface()                           │ │
-│  │       └── pci_tdisp_send_receive_data()                    │ │
-│  │           └── pci_doe_spdm_vendor_send_receive_data()      │ │
-│  │               └── libspdm_send_receive_data()              │ │
+│  │   C Layer:                                                 │ │
+│  │   dev_tdisp_cmds.c → pci_tdisp_xxx()                       │ │
+│  │       → pci_doe_spdm_vendor_send_receive_data()            │ │
 │  │                                                            │ │
-│  │  LINK_LIBRARIES:                                           │ │
-│  │   rmm-pci_tdisp_requester_lib  ← ext/spdm-emu/            │ │
-│  │     │                                                      │ │
-│  │     ▼ (link PUBLIC)                                        │ │
-│  │   rmm-pci_doe_requester_lib   ← ext/spdm-emu/            │ │
-│  │     │                                                      │ │
-│  │     ▼ (link PUBLIC)                                        │ │
-│  │   rmm-spdm_requester          ← ext/libspdm/             │ │
+│  │   Rust Layer (rust-spdm-minimal):                          │ │
+│  │   libspdm_send_receive_data()                              │ │
+│  │       → transport_encode/decode callbacks                  │ │
+│  │       → AES-256-GCM secured message handling               │ │
+│  │                                                            │ │
+│  │   Platform Layer:                                          │ │
+│  │   host_spdm_rsp_ifc.c → TCP socket (port 2323)            │ │
 │  └───────────────────────────────────────────────────────────┘ │
+└─────────────────────────────────────────────────────────────────┘
+                              │
+                              │ TCP/DOE
+                              ▼
+                    spdm_responder_emu (Responder)
+                    ext/spdm-emu/ (External Process)
+```
+
+## Build Commands
+
+**使用 Python 脚本构建 - 不要直接运行 cmake:**
+
+```bash
+# 使用 C 库 (默认)
+python tfrmm.py build
+
+# 使用 Rust 库
+python tfrmm.py build --spdm-lib=rust
+
+# 清理构建
+python tfrmm.py build --clean --spdm-lib=rust
+
+# 运行测试
+python tfrmm.py run --spdm-lib=rust
+
+# 完整流程
+python tfrmm.py all --spdm-lib=rust
+```
+
+**CMake 切换方式:**
+```bash
+# Rust库
+cmake .. -DRMM_CONFIG=host_defcfg -DLOG_LEVEL=40 -DRMM_USE_RUST_SPDM=ON
+
+# C库
+cmake .. -DRMM_CONFIG=host_defcfg -DLOG_LEVEL=40 -DRMM_USE_RUST_SPDM=OFF
+```
+
+Build output: `build/Release/rmm.elf`
+
+---
+
+## SPDM/TDISP Protocol Flow
+
+### Complete Protocol Sequence
+
+```
+PDEV_CREATE
+    │
+    ▼
+[Stage 1] init_connection()
+    │  GET_VERSION → VERSION (spdm_request_len cleared)
+    │  GET_CAPABILITIES → CAPABILITIES (spdm_request_len cleared)
+    │  NEGOTIATE_ALGORITHMS → ALGORITHMS (spdm_request_len cleared)
+    ▼
+[Stage 2] get_digests() + get_certificate()
+    │  GET_DIGESTS → DIGESTS
+    │  GET_CERTIFICATE → CERTIFICATE (chunks, accumulate cert_chain)
+    │  cert_chain_len = 1539 bytes
+    ▼
+[Stage 2] key_exchange()
+    │  KEY_EXCHANGE → KEY_EXCHANGE_RSP
+    │  session_id = 0xFFFFFFFF (calc: (rsp << 16) | req)
+    │  TH1/TH2 transcript computation
+    │  finish() → FINISH_RSP
+    ▼
+[Stage 2] challenge()
+    │  CHALLENGE → CHALLENGE_AUTH
+    │  Verify cert_chain, extract public key
+    ▼
+PDEV_HAS_KEY state
+    │
+    ▼
+[Stage 4] VDEV_ASSIGN
+    │
+    ▼
+[Stage 6] TDISP Lock/Start (via secured session)
+    │  pci_tdisp_lock_interface() (session_id required)
+    │  pci_tdisp_start_interface() (session_id required)
+    │  Secured messages: AES-256-GCM encrypted
+    ▼
+VDEV_RUN state
+    │
+    ▼
+[Cleanup] DESTROY flow
+    │  VDEV_UNLOCK → END_SESSION
+    │  VDEV_DESTROY
+    │  PDEV_STOP
+    │  PDEV_DESTROY
+    │  REALM_DESTROY
+    ▼
+Exit code: 0
+```
+
+---
+
+## Debugging Methodology
+
+### Comparison Testing
+
+**核心方法: 对比 C 库和 Rust 库的输出**
+
+```bash
+# Run C library
+python tfrmm.py build --spdm-lib=c
+python tfrmm.py run --spdm-lib=c > c_output.log
+
+# Run Rust library
+python tfrmm.py build --spdm-lib=rust
+python tfrmm.py run --spdm-lib=rust > rust_output.log
+
+# Compare key metrics
+diff c_output.log rust_output.log
+grep "cert_chain_len" *.log
+grep "session_id" *.log
+grep "flags=0x" *.log  # Request/Response caching flags
+```
+
+### Key Debug Output Patterns
+
+```
+[HOST_DEBUG] cache_dev_req_resp: flags=0x3 REQ_CACHE=1 RSP_CACHE=1
+[HOST_DEBUG] cache_dev_req_resp: flags=0x6 REQ_CACHE=0 RSP_CACHE=1
+[HOST_DEBUG] pdev_cache_object: obj_id=1 buf_len=972 cert_chain_len=0
+[RUST] key_exchange SUCCESS: session_id=0xffffffff
+[RUST] transport_decode returned: ret=0
+```
+
+### Flags Interpretation
+
+| flags | Meaning | When to appear |
+|-------|---------|----------------|
+| `0x3` (REQ_CACHE + RSP_CACHE) | Both request and response cached | VERSION first response (clears spdm_request_len) |
+| `0x6` (RSP_CACHE only) | Only response cached | After spdm_request_len cleared |
+| `0x2` (RSP_CACHE bit) | Response only | Normal operation |
+
+---
+
+## Completed Fixes (10 Critical Issues)
+
+### 1. Session ID Formula Fix (commit 6804cd2)
+
+**Problem**: Hardcoded session_id mismatch
+**Fix**: `(rsp_session_id << 16) | req_session_id`
+**Code**: `libspdm_start_session()` in `rust-spdm-minimal/src/ffi/libspdm.rs`
+
+### 2. req_session_id Value Fix (commit 6804cd2)
+
+**Problem**: Hardcoded 0x1234
+**Fix**: Use 0xFFFF (matches C's `LIBSPDM_MAX_SESSION_COUNT`)
+**Code**: KEY_EXCHANGE request building
+
+### 3. VERSION DOE Padding Trim (commit 6804cd2)
+
+**Problem**: Using DOE-padded size instead of actual SPDM message size
+**Fix**: Calculate actual size from response content
+**Code**: `init_connection()` - `actual_rsp_size = 6 + version_count * 2`
+
+### 4. Certificate Caching (commit 9008fd1)
+
+**Problem**: cert_chain not being populated
+**Fix**: Call `transport_decode` after each CERTIFICATE chunk to trigger `cma_spdm_cache_certificate`
+**Code**: `get_certificate()` line 1612-1622
+
+### 5. TH1 Transcript Storage Fix
+
+**Problem**: Request bytes overwritten by recv()
+**Fix**: Save request bytes BEFORE calling recv()
+**Code**: KEY_EXCHANGE - `saved_request_bytes` array
+
+### 6. Transport_encode Parameters Fix (commit a725a0f)
+
+**Problem**: Wrong SPDM message pointer and buffer capacity
+**Fix**: Pass SPDM message pointer (not transport buffer) and full buffer capacity
+**Code**: `call_transport_encode()` signature
+
+### 7. TDISP Stub Functions (commit a366a9c)
+
+**Problem**: TDISP functions unimplemented
+**Fix**: Implement `pci_tdisp_get_version`, `pci_tdisp_get_capabilities`, `pci_tdisp_lock_interface`
+**Code**: `rust-spdm-minimal/src/ffi/libspdm.rs` lines 3400-3700
+
+### 8. AES-256-GCM Implementation (commit 8bd2e8f)
+
+**Problem**: Secured messages couldn't be encrypted/decrypted
+**Fix**: Full AES-256-GCM implementation for secured message encoding/decoding
+**Code**: `libspdm_encode_secured_message`, `libspdm_decode_secured_message`
+
+### 9. Transport_decode Buffer Capacity (commit c544e29)
+
+**Problem**: "buffer too small (cap=0, need=6)"
+**Fix**: Initialize `decoded_size = 4096` (buffer capacity, not output size)
+**Code**: `libspdm_send_receive_data()` line 2066
+
+### 10. init_connection transport_decode Fix (commit c9c812e)
+
+**Problem**: cert_chain corrupted with wrong GET_VERSION request (4 bytes), "Get public key failed"
+**Root Cause**: `spdm_request_len` not cleared after init_connection responses
+**Fix**: Add `call_transport_decode` after VERSION, CAPABILITIES, ALGORITHMS responses
+**Code**: `init_connection()` lines 964, 1140, 1328
+
+---
+
+## Technical Insights
+
+### 1. Buffer Acquisition Model
+
+C 库使用同一个缓冲区作为 sender 和 receiver:
+```rust
+sender_buf = call_acquire_sender(context);  // Get buffer
+call_send(context, sender_buf, size);       // Send from buffer
+// recv() may OVERWRITE the same buffer!
+recv_buf = call_acquire_receiver(context);  // Same buffer pointer
+call_recv(context, recv_buf, &size);        // Receive into same buffer
+```
+
+**结论**: 必须在 recv() 之前保存 request bytes。
+
+### 2. Transport Callback Mechanism
+
+```
+┌─────────────────────────────────────────────────────────────────┐
+│                    Transport Callback Flow                       │
+│                                                                 │
+│  Request Side:                                                  │
+│  transport_encode(spdm_msg, session_id)                        │
+│      │                                                          │
+│      ├─ session_id=NULL → is_msg_sspdm=false (unsecured)       │
+│      │     → save_spdm_req() sets spdm_request_len             │
+│      │                                                          │
+│      ├─ session_id!=NULL → is_msg_sspdm=true (secured)         │
+│      │     → AES-256-GCM encrypt                                │
+│      │     → save_spdm_req() sets spdm_request_len             │
+│      │                                                          │
+│  Response Side:                                                 │
+│  transport_decode(transport_msg, session_id)                   │
+│      │                                                          │
+│      ├─ Parse SPDM header                                       │
+│      ├─ Dispatch to cache callback based on response_code:     │
+│      │     VERSION → dev_assign_cache_versions_rsp()           │
+│      │     CAPABILITIES → dev_assign_cache_capabilities_rsp()  │
+│      │     ALGORITHMS → dev_assign_cache_algorithms_rsp()      │
+│      │     CERTIFICATE → cma_spdm_cache_certificate()          │
+│      │                                                          │
+│      ├─ dev_assign_dev_comm_set_cache():                       │
+│      │     if spdm_request_len > 0:                             │
+│      │         flags |= REQ_CACHE (cache saved request)        │
+│      │         spdm_request_len = 0  ← CRITICAL: CLEARS IT    │
+│      │     flags |= RSP_CACHE (cache response)                 │
+│      │                                                          │
 └─────────────────────────────────────────────────────────────────┘
 ```
 
-### Library Sources Comparison
-| Library | Submodule | Purpose |
-|---------|-----------|---------|
-| `rmm-spdm_requester` | `ext/libspdm/` | SPDM core protocol |
-| `rmm-pci_tdisp_requester_lib` | `ext/spdm-emu/` | TDISP protocol layer (depends on libspdm) |
-| `rmm-pci_doe_requester_lib` | `ext/spdm-emu/` | DOE + VDM encapsulation (depends on libspdm) |
-| `rmm-pci-ide-km-requester-lib` | `ext/spdm-emu/` | IDE Key Management (disabled but linked) |
+**关键发现**: `transport_decode` 的回调函数会清除 `spdm_request_len`。如果不调用 transport_decode，`spdm_request_len` 会保持设置状态，导致后续的 CERTIFICATE response 错误地缓存了之前保存的 GET_VERSION request。
 
-### TDISP API Interface
-Header: `ext/spdm-emu/include/library/pci_tdisp_requester_lib.h`
+### 3. Secured Message Handling
 
-| Function | Purpose |
-|----------|---------|
-| `pci_tdisp_get_version()` | Version negotiation |
-| `pci_tdisp_get_capabilities()` | Capability exchange |
-| `pci_tdisp_get_interface_state()` | Get TDI state (UNLOCKED/LOCKED/RUN) |
-| `pci_tdisp_lock_interface()` | Lock interface, generate nonce |
-| `pci_tdisp_get_interface_report()` | Get interface report |
-| `pci_tdisp_start_interface()` | Start interface with nonce |
-| `pci_tdisp_stop_interface()` | Stop interface |
+TDISP 操作需要 secured session:
 
-### TDISP Business Implementation
-Code: `app/device_assignment/el0_app/src/dev_tdisp_cmds.c`
+```
+Session establishment:
+  KEY_EXCHANGE → session_id = 0xFFFFFFFF
+  FINISH → session established
 
-| Function | TDISP Flow |
-|----------|-----------|
-| `dev_tdisp_lock_main()` | GET_VERSION → GET_CAPS → GET_STATE → LOCK_INTERFACE → verify LOCKED |
-| `dev_tdisp_report_main()` | GET_INTERFACE_REPORT (optional) |
-| `dev_tdisp_start_main()` | DVSEC enable → START_INTERFACE → verify RUN |
-| `dev_tdisp_stop_main()` | STOP_INTERFACE → verify UNLOCKED |
+Secured message encoding (AES-256-GCM):
+  1. Compute AAD (additional authenticated data)
+  2. Generate random IV (12 bytes)
+  3. Encrypt: ciphertext + 16-byte tag
+  4. Build secured message: header + IV + ciphertext + tag
 
-### Key Files
+Session termination:
+  END_SESSION → END_SESSION_ACK
+  reset_context() clears all session state
+```
+
+### 4. Caching Object Types
+
+| obj_id | Object Type | When cached |
+|--------|-------------|-------------|
+| 0 | VCA (Version/Capabilities/Algorithms) | init_connection responses |
+| 1 | Certificate Chain | get_certificate responses |
+| 2 | Measurements | challenge responses |
+| 3 | Interface Report | TDISP get_interface_report |
+
+---
+
+## Verification Results
+
+### Final Test Matrix (2026-04-22)
+
+| Test | Rust Library | C Library | Status |
+|------|-------------|-----------|--------|
+| Stage 1 (init_connection) | ✓ | ✓ | PASS |
+| Stage 2 (PDEV setup) | ✓ | ✓ | PASS |
+| Stage 3 (Attestation) | ✓ | ✓ | PASS |
+| Stage 4 (VDEV assign) | ✓ | ✓ | PASS |
+| Stage 5 (DA tests) | ✓ | ✓ | PASS |
+| Stage 6 (TDISP) | ✓ | ✓ | PASS |
+| VDEV_UNLOCK | RMI_SUCCESS | RMI_SUCCESS | PASS |
+| VDEV_DESTROY | RMI_SUCCESS | RMI_SUCCESS | PASS |
+| PDEV_STOP | RMI_SUCCESS | RMI_SUCCESS | PASS |
+| PDEV_DESTROY | RMI_SUCCESS | RMI_SUCCESS | PASS |
+| REALM_DESTROY | RMI_SUCCESS | RMI_SUCCESS | PASS |
+| Exit Code | **0** | **0** | PASS |
+| cert_chain_len | **1539** | **1539** | PASS |
+| session_id | 0xFFFFFFFF | 0xFFFFFFFF | PASS |
+
+### Key Metrics Comparison
+
+```
+C Library Output:
+  cert_chain_len=1539
+  session_id=0xffffffff
+  flags=0x6 (RSP_CACHE only for CERTIFICATE)
+  Exit code: 0
+
+Rust Library Output:
+  cert_chain_len=1539
+  session_id=0xffffffff
+  flags=0x6 (RSP_CACHE only for CERTIFICATE)
+  Exit code: 0
+```
+
+---
+
+## Key Files Reference
+
+### Rust Library Source
+| File | Content |
+|------|---------|
+| `rust-spdm-minimal/src/ffi/libspdm.rs` | All FFI implementations |
+| `rust-spdm-minimal/include/rust_spdm.h` | Header for C integration |
+| `rust-spdm-minimal/Cargo.toml` | Build configuration |
+
+### C Integration Points
 | File | Role |
 |------|------|
-| `app/device_assignment/el0_app/spdm_emu/CMakeLists.txt` | Builds TDISP/DOE requester libs from spdm-emu |
-| `app/device_assignment/el0_app/src/dev_tdisp_cmds.c` | TDISP business logic implementation |
-| `ext/spdm-emu/library/pci_tdisp_requester_lib/` | TDISP requester library source |
-| `ext/spdm-emu/library/pci_doe_requester_lib/` | DOE + VDM transport layer |
+| `app/device_assignment/el0_app/src/dev_assign_el0_app.c` | Transport callbacks, caching logic |
+| `plat/host/host_build/src/host_da.c` | Device attestation, cert_chain handling |
+| `plat/host/host_build/src/host_spdm_rsp_ifc.c` | TCP socket communication |
 
-### Transmission Mechanism
-TDISP messages transmitted via SPDM Vendor Defined Messages (VDM):
+### Reference C Library
+| File | Role |
+|------|------|
+| `ext/libspdm/library/spdm_requester_lib/libspdm_req_communication.c` | C's init_connection reference |
+| `ext/libspdm/library/spdm_requester_lib/libspdm_req_get_certificate.c` | C's get_certificate reference |
 
-```
-pci_tdisp_xxx()
-    → pci_tdisp_send_receive_data()
-        → pci_doe_spdm_vendor_send_receive_data()  (PCI_PROTOCOL_ID_TDISP = 0x01)
-            → libspdm_send_receive_data()
-                → host_spdm_rsp_communicate()  (TCP socket)
-```
+---
 
-### Key Point
-- **TDISP library comes from spdm-emu**, NOT from libspdm
-- **TDISP library is linked into rmm.elf** as `rmm-pci_tdisp_requester_lib`
-- **TDISP library depends on libspdm** through DOE/VDM transport layer
-- All TDISP messages require an established SPDM secure session (`session_id`)
+## Troubleshooting Guide
 
-## Platform Code
-Fake_host platform: `plat/host/`
-- `host_build/src/host_da.c`: Device attestation setup
-- `host_build/src/host_spdm_rsp_ifc.c`: SPDM responder interface (TCP + DOE)
-- `host_build/src/host_setup.c`: Process launch and main entry
-- `runtime/rmi/pdev.c`: PDEV creation with SPDM-only flags
+### If cert_chain_len is wrong
 
-## Debugging Status (2026-04-22)
+1. Check transport_decode calls: Must call after each init_connection response
+2. Check flags output: Should see `0x3` for VERSION, `0x6` for subsequent
+3. Verify `spdm_request_len` cleared: Look for REQ_CACHE flag transitions
 
-### Session: Rust Library Full Replacement - COMPLETE
+### If TDISP fails
 
-**Goal**: 实现 rust-spdm-minimal 完全替换 libspdm C 库
+1. Check session_id: Must be 0xFFFFFFFF (or responder-assigned value)
+2. Check secured message encryption: AES-256-GCM with correct IV/AAD
+3. Check transport_encode/decode buffer sizes: Must be 4096 capacity
 
-**Status**: ✅ **COMPLETE** - Rust library fully replaces C library, all stages pass with exit code 0
+### If program hangs
 
-### All Completed Fixes
+1. Check spdm_request_len state: If stuck at non-zero, cache callback not triggered
+2. Check is_msg_sspdm flag: Must be false for GET_VERSION after END_SESSION
+3. Check socket communication: responder_emu may have crashed
 
-1. ✓ Session ID formula fix (commit 6804cd2): `(rsp << 16) | req`
-2. ✓ req_session_id fix (commit 6804cd2): Use 0xFFFF instead of hardcoded 0x1234
-3. ✓ VERSION DOE padding trim (commit 6804cd2): Use actual SPDM size, not DOE padded
-4. ✓ Certificate caching via transport_decode (commit 9008fd1): Call `call_transport_decode` in `get_certificate`
-5. ✓ TH1 transcript storage fix: Save request bytes before `recv()`
-6. ✓ **Transport_encode parameters fix (commit a725a0f)**: Pass correct SPDM message pointer and buffer capacity
-7. ✓ **TDISP stub functions implementation (commit a366a9c)**: Full TDISP protocol compliance
-8. ✓ **AES-256-GCM encryption/decryption (commit 8bd2e8f)**: Full secured message implementation
-9. ✓ **Transport_decode buffer capacity fix (commit c544e29)**: Initialize decoded_size to 4096 instead of 0
-10. ✓ **init_connection transport_decode fix (commit c9c812e)**: Clear spdm_request_len to prevent cert_chain corruption
+---
 
-### Latest Fix: init_connection transport_decode (c9c812e)
+## Project Status
 
-**Problem**: cert_chain corrupted, causing "Get public key failed (cert_len=1543)"
-**Root Cause**: Rust's `init_connection` did NOT call `transport_decode` after responses:
-- `transport_encode` saves requests (sets `spdm_request_len`)
-- `transport_decode` triggers caching callbacks that clear `spdm_request_len`
-- Without decode calls, `spdm_request_len` remained set
-- First CERTIFICATE response cached wrong GET_VERSION request (4 bytes) alongside cert
+**Status**: ✅ **COMPLETE**
 
-**Fix**: Added `call_transport_decode` after each response in `init_connection`:
-- VERSION response → triggers `dev_assign_cache_versions_rsp`
-- CAPABILITIES response → triggers `dev_assign_cache_capabilities_rsp`
-- ALGORITHMS response → triggers `dev_assign_cache_algorithms_rsp`
-
-**Result**: cert_chain_len=1539 (correct), public key extraction succeeds, exit code 0
-
-### Verified Working (2026-04-22)
-
-| Test | Rust Library | C Library |
-|------|-------------|-----------|
-| Stage 1-5 (PDEV, Realm) | ✓ PASS | ✓ PASS |
-| Stage 6 (TDISP Lock/Start) | ✓ PASS | ✓ PASS |
-| VDEV_UNLOCK | ✓ RMI_SUCCESS | ✓ RMI_SUCCESS |
-| REALM_DESTROY | ✓ RMI_SUCCESS | ✓ RMI_SUCCESS |
-| PDEV_DESTROY | ✓ RMI_SUCCESS | ✓ RMI_SUCCESS |
-| Exit Code | 0 | 0 |
-| cert_chain_len | 1539 | 1539 |
-
-### Key Technical Insights
-
-1. **Buffer Acquisition**: Same buffer pointer for sender and receiver - save request before recv()
-2. **Transport Encoding**: 
-   - SPDM message located at (buffer + transport_header_size)
-   - transport_encode wraps with DOE header + secured message encryption
-   - Pass SPDM message pointer and full buffer for output
-3. **VDEV/PDEV Session**: Share same session_id from `dev_assign_info`
-4. **Secured Messages**: Transport callbacks handle DOE wrapping and encryption transparently
+- Rust library fully replaces C library
+- All 10 critical fixes implemented and verified
+- Clean build works with exit code 0
+- All DESTROY operations visible in output
+- Pushed to remote: `github.com:liwz-hz/tf-rmm.git`
