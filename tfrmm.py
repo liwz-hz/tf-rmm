@@ -92,6 +92,13 @@ def cmd_build(clean=False, spdm_lib="rust"):
         if BUILD_DIR.exists():
             import shutil
             shutil.rmtree(BUILD_DIR)
+        
+        # Also clean Rust SPDM library artifacts to force fresh rebuild
+        if spdm_lib == "rust":
+            rust_lib = PROJECT_ROOT / "rust-spdm-minimal" / "target" / "release" / "librust_spdm_minimal.a"
+            if rust_lib.exists():
+                rust_lib.unlink()
+                print(f"[INFO] Removed Rust library: {rust_lib}")
     
     BUILD_DIR.mkdir(parents=True, exist_ok=True)
     

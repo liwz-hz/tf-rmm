@@ -439,6 +439,8 @@ spdm_transport_encode_message(void *spdm_context, const uint32_t *session_id,
 
 	spdm_header = message;
 
+	INFO("[ENCODE] req=0x%02x\n", spdm_header->request_response_code);
+
 	if (spdm_header->request_response_code == U(SPDM_GET_VERSION)) {
 		/*
 		 * TODO: During RMI_PDEV_STOP libspdm_get_version is called, to
