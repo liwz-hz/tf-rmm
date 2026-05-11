@@ -1098,7 +1098,22 @@ pub extern "C" fn libspdm_init_connection(context: libspdm_context_t, get_versio
         
         debug_print!("  sending GET_CAPABILITIES: ver=0x%02x, size=%zu", ver_byte as u32, caps_req_size);
         
-        let send_ret2 = call_send(context, sender_buf2, caps_req_size);
+        // Use transport_encode for GET_CAPABILITIES (unsecured, NULL session_id)
+        let (encode_ret2, transport_msg2, transport_size2) = call_transport_encode(
+            context,
+            core::ptr::null(), // session_id=NULL for unsecured
+            sender_buf2,        // SPDM message
+            caps_req_size,      // SPDM message size
+            sender_buf2,        // Output transport buffer
+            4096,               // Buffer capacity
+        );
+        if encode_ret2 != LIBSPDM_STATUS_SUCCESS {
+            call_release_sender(context, sender_buf2 as *mut c_void);
+            debug_print!("  ERROR: transport_encode for GET_CAPABILITIES failed");
+            return LIBSPDM_STATUS_ERROR;
+        }
+        
+        let send_ret2 = call_send(context, transport_msg2, transport_size2);
         if send_ret2 != LIBSPDM_STATUS_SUCCESS {
             call_release_sender(context, sender_buf2 as *mut c_void);
             debug_print!("  ERROR: GET_CAPABILITIES send failed");
@@ -1285,8 +1300,22 @@ pub extern "C" fn libspdm_init_connection(context: libspdm_context_t, get_versio
         debug_print!("  sending NEGOTIATE_ALGORITHMS: ver=0x%02x, size=%zu, tables=%u", ver_byte as u32, alg_req_size, num_struct_tables as u32);
         debug_print!("    base_asym=0x%x, base_hash=0x%x, meas_spec=0x%x", base_asym, base_hash, meas_spec as u32);
         
-        // Send NEGOTIATE_ALGORITHMS
-        let send_ret3 = call_send(context, sender_buf3, alg_req_size);
+        // Use transport_encode for NEGOTIATE_ALGORITHMS (unsecured, NULL session_id)
+        let (encode_ret3, transport_msg3, transport_size3) = call_transport_encode(
+            context,
+            core::ptr::null(), // session_id=NULL for unsecured
+            sender_buf3,        // SPDM message
+            alg_req_size,       // SPDM message size
+            sender_buf3,        // Output transport buffer
+            4096,               // Buffer capacity
+        );
+        if encode_ret3 != LIBSPDM_STATUS_SUCCESS {
+            call_release_sender(context, sender_buf3 as *mut c_void);
+            debug_print!("  ERROR: transport_encode for NEGOTIATE_ALGORITHMS failed");
+            return LIBSPDM_STATUS_ERROR;
+        }
+        
+        let send_ret3 = call_send(context, transport_msg3, transport_size3);
         if send_ret3 != LIBSPDM_STATUS_SUCCESS {
             call_release_sender(context, sender_buf3 as *mut c_void);
             debug_print!("  ERROR: NEGOTIATE_ALGORITHMS send failed");
